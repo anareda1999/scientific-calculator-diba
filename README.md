@@ -85,6 +85,25 @@ Coefficients accept scientific functions: `sin`, `cos`, `tan`, `cot`, `log`, `ln
 - **Integral** — Simpson's rule between two bounds
 - **Root finder** — Newton + bisection
 
+### 🔬 Advanced Analysis (new module)
+A dedicated window with four tabs:
+
+| Tab | What it does |
+|-----|--------------|
+| **Limits** | `lim f(x)` as `x → a`, `a-`, `a+`, `+∞`, `-∞` — direct substitution, numeric approach with uncertainty, and divergence detection (±∞) |
+| **Taylor** | Series expansion of `f` around any point, up to order 12 — shows every derivative and the resulting polynomial |
+| **Inequalities** | Solves `f(x) > 0`, `≥ 0`, `< 0`, `≤ 0` — returns the solution as a union of intervals |
+| **Differential equations** | `y' = f(x,y)` and `y'' = f(x,y,y')` solved with Runge-Kutta 4 — initial conditions, variable range, result table |
+
+**Examples:**
+```
+Limit     : (x^2-1)/(x-1)  as x→1        =  2
+Limit     : 1/x            as x→0+        =  +∞
+Taylor    : exp(x)  at 0, order 4        =  1 + x + 0.5x² + 0.1667x³ + 0.0376x⁴
+Inequality: x^2-4 > 0                    =  [ -∞ ; -2 ] ∪ [ 2 ; +∞ ]
+ODE       : y' = y,  y(0)=1,  x∈[0,1]   →  y(1) = 2.718281828
+```
+
 ### 📊 Statistics
 `mean` `median` `mode` `stdev` `variance` `min` `max` `sum` `range` `count` `percentile` + **linear regression** (slope, intercept, R², correlation)
 
@@ -122,10 +141,9 @@ Output: `dist/ScientificCalculator.exe` — no Python needed on the target machi
 ## ✅ Run the Test Suite
 
 ```bash
-python tests/test_engine.py
+python tests/test_engine.py      # 95 tests - parser, evaluator, matrices, stats
+python tests/test_calculus.py    # 33 tests - limits, Taylor, inequalities, ODEs
 ```
-
-95 unit tests covering the parser, evaluator, complex numbers, calculus, equations, systems, matrices, statistics and unit conversion.
 
 ---
 
@@ -136,6 +154,7 @@ test001/
 ├── scientific_calculator.py      # Entry point / application shell
 ├── core/                         # ── Pure logic (no UI) ──
 │   ├── engine.py                 #   Tokenizer, parser, evaluator, calculus
+│   ├── calculus.py               #   Limits, Taylor, inequalities, ODEs
 │   ├── matrices.py               #   Matrix operations
 │   ├── equations.py              #   Linear/quadratic/system solvers
 │   ├── statistics.py             #   Descriptive statistics & regression
@@ -150,9 +169,11 @@ test001/
 │   ├── formulas_view.py          #   Formula library
 │   ├── matrix_view.py            #   Matrix calculator
 │   ├── calculus_view.py          #   Derivative / integral / roots
+│   ├── advanced_view.py          #   Limits / Taylor / inequalities / ODEs
 │   └── stats_view.py             #   Statistics
 ├── tests/
-│   └── test_engine.py            #   95 unit tests
+│   ├── test_engine.py            #   95 unit tests
+│   └── test_calculus.py          #   33 unit tests
 ├── ScientificCalculator.spec     # PyInstaller config
 ├── version.txt                   # Windows version resource
 ├── requirements.txt

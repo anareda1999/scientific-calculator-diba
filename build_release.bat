@@ -24,6 +24,13 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
+python tests\test_calculus.py
+if errorlevel 1 (
+    echo.
+    echo [!] TESTS FAILED - build aborted.
+    pause
+    exit /b 1
+)
 echo.
 
 REM --- 2/5  clean -------------------------------------------------------------

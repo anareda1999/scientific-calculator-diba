@@ -107,6 +107,25 @@
       somme | etendue | effectif | percentile
       + regression lineaire (pente, ordonnee a l'origine, R2, correlation)
 
+  4.8 ANALYSE AVANCEE  /  ADVANCED ANALYSIS   (4 onglets)
+      Limites      : lim f(x) quand x -> a, a-, a+, +inf, -inf
+                     (substitution directe, approche numerique, detection
+                      des divergences vers +inf / -inf)
+      Taylor       : developpement en serie de f autour d'un point
+                     (jusqu'a l'ordre 12) - affiche chaque derivee
+      Inequations  : resout f(x) > 0, >= 0, < 0, <= 0
+                     (resultat sous forme d'union d'intervalles)
+      Equations differentielles : y' = f(x,y)  et  y'' = f(x,y,y')
+                     resolues par Runge-Kutta 4, avec conditions
+                     initiales et tableau de valeurs
+
+      Exemples :
+         Limite      : (x^2-1)/(x-1)  en x->1     =  2
+         Limite      : 1/x            en x->0+     =  +inf
+         Taylor      : exp(x) en 0, ordre 4  = 1 + x + 0.5x^2 + 0.1667x^3
+         Inequation  : x^2-4 > 0        = [ -inf ; -2 ]  U  [ 2 ; +inf ]
+         Eq. diff.   : y'=y, y(0)=1     -> y(1) = 2.718281828
+
 
 --------------------------------------------------------------------------------
   5. CALCULS AVEC NOMBRES COMPLEXES

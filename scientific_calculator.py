@@ -38,6 +38,7 @@ from ui.formulas_view import FormulasView
 from ui.matrix_view import MatrixView
 from ui.calculus_view import CalculusView
 from ui.stats_view import StatsView
+from ui.advanced_view import AdvancedView
 
 APP_NAME = "Scientific Calculator"
 VERSION = "2.0.0"
@@ -148,6 +149,7 @@ class ScientificCalculatorApp:
             ("formulas", self.formulas.open, th.FORMULA, th.FORMULA_T),
             ("matrices", self.matrices.open, th.MATRIX, th.MATRIX_T),
             ("calculus", self.calculus.open, th.CALCULUS, th.CALCULUS_T),
+            ("advanced", self.advanced.open, th.ACCENT, "#ffffff"),
             ("statistics", self.statistics.open, th.STATS, th.STATS_T),
         ]
         for key, command, bg, fg in modules:
@@ -171,7 +173,8 @@ class ScientificCalculatorApp:
         self.lang = code
         # close every open window
         for view in (self.grapher, self.converter, self.equations, self.formulas,
-                     self.matrices, self.calculus, self.statistics):
+                     self.matrices, self.calculus, self.statistics,
+                     self.advanced):
             try:
                 view.close()
             except Exception:
@@ -196,6 +199,7 @@ class ScientificCalculatorApp:
         self.matrices = MatrixView(self)
         self.calculus = CalculusView(self)
         self.statistics = StatsView(self)
+        self.advanced = AdvancedView(self)
 
 
 def main():

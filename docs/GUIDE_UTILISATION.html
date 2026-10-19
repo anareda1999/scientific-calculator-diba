@@ -216,6 +216,36 @@
     <p>Plus la <b>régression linéaire</b> (pente, ordonnée à l'origine, R², corrélation).</p>
   </div>
 
+  <div class="card mod">
+    <h3>3.8 Analyse avancée — 4 onglets</h3>
+    <table>
+      <tr><th>Onglet</th><th>Fonction</th></tr>
+      <tr><td><b>Limites</b></td>
+          <td><code>lim f(x)</code> pour <code>x → a</code>, <code>a-</code>,
+              <code>a+</code>, <code>+∞</code>, <code>-∞</code> —
+              substitution directe, approche numérique et détection des
+              divergences (±∞)</td></tr>
+      <tr><td><b>Taylor</b></td>
+          <td>Développement en série de <code>f</code> autour d'un point
+              (jusqu'à l'ordre 12), avec le détail de chaque dérivée</td></tr>
+      <tr><td><b>Inéquations</b></td>
+          <td>Résout <code>f(x) &gt; 0</code>, <code>≥ 0</code>,
+              <code>&lt; 0</code>, <code>≤ 0</code> — résultat sous forme
+              d'union d'intervalles</td></tr>
+      <tr><td><b>Équations différentielles</b></td>
+          <td><code>y' = f(x,y)</code> et <code>y'' = f(x,y,y')</code> par
+              Runge-Kutta 4, avec conditions initiales et tableau de valeurs</td></tr>
+    </table>
+    <p><b>Exemples :</b></p>
+    <ul>
+      <li>Limite : <code>(x^2-1)/(x-1)</code> en <code>x→1</code> → <b>2</b></li>
+      <li>Limite : <code>1/x</code> en <code>x→0+</code> → <b>+∞</b></li>
+      <li>Taylor : <code>exp(x)</code> en 0, ordre 4 → <b>1 + x + 0.5x² + 0.1667x³</b></li>
+      <li>Inéquation : <code>x^2-4 &gt; 0</code> → <b>[ -∞ ; -2 ] ∪ [ 2 ; +∞ ]</b></li>
+      <li>Éq. diff. : <code>y'=y</code>, <code>y(0)=1</code> → <b>y(1) = 2.718281828</b></li>
+    </ul>
+  </div>
+
   <h2><span class="n">4</span> Nombres complexes</h2>
   <div class="card">
     <p>Tous les calculs utilisent les nombres complexes :</p>
