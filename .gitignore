@@ -1,0 +1,39 @@
+# ── Python ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+.Python
+
+# ── PyInstaller build output ────────────────────────────
+build/
+dist/
+*.manifest
+
+# ── Compiled executable ─────────────────────────────────
+*.exe
+*.dll
+*.so
+*.dylib
+
+# ── Database files ──────────────────────────────────────
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+
+# ── Environment / secrets ───────────────────────────────
+.env
+.venv
+env/
+venv/
+
+# ── IDE / editors ───────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ── Logs ────────────────────────────────────────────────
+*.log

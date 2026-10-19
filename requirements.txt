@@ -1,0 +1,5 @@
+# Scientific Calculator - Desktop Application
+# Requires Python 3.10+
+# Build with: pyinstaller ScientificCalculator.spec --noconfirm
+
+pyinstaller==6.22.3
