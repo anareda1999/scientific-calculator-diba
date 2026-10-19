@@ -708,6 +708,9 @@ class ScientificCalculator:
         s = s.replace('√', 'sqrt')
         s = s.replace('π', 'pi')
         s = s.replace('×', '*').replace('÷', '/').replace('−', '-')
+        # Unicode superscripts -> Python power operator
+        s = s.replace('²', '**2').replace('³', '**3').replace('¹', '**1')
+        s = s.replace('⁴', '**4').replace('⁵', '**5').replace('⁶', '**6')
 
         # ── Implicit multiplication ──
         # 1) digit directly before a function name:  2sin(x) -> 2*sin(x)
@@ -933,14 +936,18 @@ class ScientificCalculator:
             try:
                 wy = eval(expr, {"__builtins__": {}}, {**ns, "x": wx})
             except Exception:
+                pts.append(None)   # domain error -> break the curve
                 continue
             if wy is None:
+                pts.append(None)
                 continue
             try:
                 wy = float(wy)
             except Exception:
+                pts.append(None)
                 continue
             if not math.isfinite(wy):
+                pts.append(None)
                 continue
             py = sy(wy)
             if -5000 < py < H + 5000:
