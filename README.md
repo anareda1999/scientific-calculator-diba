@@ -41,11 +41,28 @@ Three tabs in the Equations window:
 
 Coefficients accept scientific functions: `sin`, `cos`, `tan`, `cot`, `log`, `ln`, `exp`, `sqrt`, `pi`, `e`.
 
-### 📈 2D Grapher
-- Draws any function `y = f(x)` on a Cartesian coordinate system
-- Friendly equation parsing: `3x` → `3*x`, `x²` → `x**2`, `^` → `**`
-- Supports `sin(x)`, `cos(x)`, `tan(x)`, `exp(x)`, `log(x)`, `sqrt(x)`, `abs(x)`
-- Grid, labelled axes, and tick marks
+### 📈 Graphing Calculator (Desmos-Style)
+A full-featured graphing calculator inspired by Desmos:
+
+- **Live plotting** — curves update instantly as you type
+- **Multiple expressions** — each with its own colour, removable with ✕
+- **Draggable sliders** — write `a = 3` to create a slider, then drag it (on the graph or in the panel) to watch the curve change live
+- **Pan & zoom** — drag the canvas to pan, scroll wheel to zoom, plus zoom in/out buttons
+- **Coordinate readout** — shows `x` and `y` under the mouse cursor
+- **Supports every expression type:**
+
+| Type | Example | Result |
+|------|---------|--------|
+| Function | `y = x^2` | parabola |
+| Function | `y = sin(x)` | sine wave |
+| Implicit curve | `x^2 + y^2 = 25` | circle |
+| Vertical line | `x = 5` | straight line |
+| Point | `(3, 4)` | single point |
+| Slider | `a = 3` | draggable parameter |
+
+- **Desmos-style syntax** — implicit multiplication works: `2x`, `3x+2`, `2sin(x)`, `(x+1)(x-1)`, `x^2` (also `x²`)
+- **Functions:** `sin cos tan sec csc cot asin acos atan sinh cosh tanh log ln exp sqrt abs floor ceil sign round min max mod gcd lcm`
+- **Constants:** `pi`, `e`
 
 ### 🔄 Unit Converter
 Five categories, auto-converting as you type:
