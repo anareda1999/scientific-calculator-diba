@@ -9,7 +9,9 @@ __pycache__/
 # ── PyInstaller build output ────────────────────────────
 build/
 dist/
+release/
 *.manifest
+*.zip
 
 # ── Compiled executable ─────────────────────────────────
 *.exe
