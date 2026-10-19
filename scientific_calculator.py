@@ -1,1746 +1,206 @@
 """
-Scientific Calculator - Sweet & Modern Design
-With Desmos-Style Graphing Calculator, Equation Solvers, Unit Converter
-& Scientific Formulas. Multilingual: English, Français, العربية
-Built with Python + tkinter, packaged as a standalone .exe with PyInstaller.
+scientific_calculator.py
+=========================
+DIDA Scientific Calculator - entry point.
+
+A multilingual (FR / EN / AR) scientific calculator with:
+  * scientific keypad with memory, answer key and history tape
+  * scientific constants library (c, g, h, k, NA, R, ...)
+  * unit converter (weight, currency, volume, area, distance)
+  * equation solver (1st degree, 2nd degree, expression, roots, systems)
+  * Desmos-style graphing calculator with draggable sliders
+  * scientific formulas library
+  * matrix calculator
+  * derivative / integral / root finder
+  * descriptive statistics and linear regression
+
+The expression engine (core/engine.py) uses a hand written tokenizer and
+recursive-descent parser - no eval() / exec() anywhere.
+
 Copyright © reda anagou
 """
 
-import math
-import re
+import os
+import sys
 import tkinter as tk
-from tkinter import ttk, font as tkfont
+
+# make the packages importable when the script is run directly
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from core.engine import Engine, ExprError, format_number
+from ui.theme import Theme
+from ui.i18n import STRINGS, LANGUAGES, translate
+from ui.calculator_view import CalculatorView
+from ui.grapher_view import GrapherView
+from ui.converter_view import ConverterView
+from ui.equations_view import EquationsView
+from ui.formulas_view import FormulasView
+from ui.matrix_view import MatrixView
+from ui.calculus_view import CalculusView
+from ui.stats_view import StatsView
+
+APP_NAME = "Scientific Calculator"
+VERSION = "2.0.0"
 
 
-class ScientificCalculator:
-    # ── Translations ──────────────────────────────────────────────
-    TR = {
-        "app_title": {
-            "en": "Scientific Calculator",
-            "fr": "Calculatrice Scientifique",
-            "ar": "الآلة الحاسبة العلمية",
-        },
-        "scientific": {"en": "SCIENTIFIC", "fr": "SCIENTIFIQUE", "ar": "علمي"},
-        "converter": {"en": "Converter", "fr": "Convertisseur", "ar": "محول الوحدات"},
-        "equations": {"en": "Equations", "fr": "Équations", "ar": "المعادلات"},
-        "grapher": {"en": "Graphing", "fr": "Graphique", "ar": "الرسوم البيانية"},
-        "formulas": {"en": "Formulas", "fr": "Formules", "ar": "الصيغ"},
-        "language": {"en": "Language", "fr": "Langue", "ar": "اللغة"},
-        "deg": {"en": "DEG", "fr": "DEG", "ar": "درجة"},
-        "from": {"en": "From", "fr": "De", "ar": "من"},
-        "to": {"en": "To", "fr": "À", "ar": "إلى"},
-        "swap": {"en": "Swap", "fr": "Inverser", "ar": "تبديل"},
-        "weight": {"en": "Weight", "fr": "Poids", "ar": "الوزن"},
-        "currency": {"en": "Currency", "fr": "Devise", "ar": "العملة"},
-        "volume": {"en": "Volume", "fr": "Volume", "ar": "الحجم"},
-        "area": {"en": "Area", "fr": "Surface", "ar": "المساحة"},
-        "distance": {"en": "Distance", "fr": "Distance", "ar": "المسافة"},
-        "eq_title": {"en": "Equations", "fr": "Équations", "ar": "المعادلات"},
-        "eq1_tab": {
-            "en": "1st degree  ax + b = 0",
-            "fr": "1er degré  ax + b = 0",
-            "ar": "الدرجة الأولى  ax + b = 0",
-        },
-        "eq2_tab": {
-            "en": "2nd degree  ax² + bx + c = 0",
-            "fr": "2ème degré  ax² + bx + c = 0",
-            "ar": "الدرجة الثانية  ax² + bx + c = 0",
-        },
-        "coeff_a": {"en": "Coefficient a", "fr": "Coefficient a", "ar": "المعامل أ"},
-        "coeff_b": {"en": "Coefficient b", "fr": "Coefficient b", "ar": "المعامل ب"},
-        "coeff_c": {"en": "Coefficient c", "fr": "Coefficient c", "ar": "المعامل ج"},
-        "solve": {"en": "Solve", "fr": "Résoudre", "ar": "حل"},
-        "inf_solutions": {"en": "Infinite solutions", "fr": "∞ solutions", "ar": "حلول غير محدودة"},
-        "no_solution": {"en": "No solution", "fr": "Pas de solution", "ar": "لا يوجد حل"},
-        "invalid_input": {"en": "Invalid input", "fr": "Entrée invalide", "ar": "إدخال غير صحيح"},
-        "graph_title": {"en": "Graphing Calculator", "fr": "Calculatrice Graphique", "ar": "الآلة الحاسبة البيانية"},
-        "y_eq": {"en": "y = f(x)", "fr": "y = f(x)", "ar": "ص = د(س)"},
-        "draw": {"en": "Draw", "fr": "Tracer", "ar": "رسم"},
-        "clear": {"en": "Clear", "fr": "Effacer", "ar": "مسح"},
-        "func_error": {"en": "Function error", "fr": "Erreur de fonction", "ar": "خطأ في الدالة"},
-        "graph_hint": {
-            "en": "Ex: x**2+3*x-10, sin(x), cos(x), exp(x), log(x), sqrt(x)",
-            "fr": "Ex: x**2+3*x-10, sin(x), cos(x), exp(x), log(x), sqrt(x)",
-            "ar": "مثال: x**2+3*x-10, sin(x), cos(x), exp(x), log(x), sqrt(x)",
-        },
-        "copyright": {"en": "© reda anagou", "fr": "© reda anagou", "ar": "© reda anagou"},
-        "formula_title": {
-            "en": "Scientific Formulas", "fr": "Formules Scientifiques", "ar": "الصيغ العلمية",
-        },
-        "formula_quadratic": {
-            "en": "Quadratic Formula", "fr": "Formule du second degré", "ar": "صيغة المعادلة التربيعية",
-        },
-        "formula_area_circle": {
-            "en": "Area of Circle", "fr": "Aire du cercle", "ar": "مساحة الدائرة",
-        },
-        "formula_area_rect": {
-            "en": "Area of Rectangle", "fr": "Aire du rectangle", "ar": "مساحة المستطيل",
-        },
-        "formula_area_triangle": {
-            "en": "Area of Triangle", "fr": "Aire du triangle", "ar": "مساحة المثلث",
-        },
-        "formula_volume_sphere": {
-            "en": "Volume of Sphere", "fr": "Volume de la sphère", "ar": "حجم الكرة",
-        },
-        "formula_volume_cyl": {
-            "en": "Volume of Cylinder", "fr": "Volume du cylindre", "ar": "حجم الأسطوانة",
-        },
-        "formula_ohm": {
-            "en": "Ohm's Law (V=IR)", "fr": "Loi d'Ohm (V=IR)", "ar": "قانون أوم (V=IR)",
-        },
-        "formula_force": {
-            "en": "Force (F=ma)", "fr": "Force (F=ma)", "ar": "القوة (F=ma)",
-        },
-        "formula_kinetic": {
-            "en": "Kinetic Energy", "fr": "Énergie cinétique", "ar": "طاقة الحركة",
-        },
-        "formula_result": {"en": "Result", "fr": "Résultat", "ar": "النتيجة"},
-        "calculate": {"en": "Calculate", "fr": "Calculer", "ar": "احسب"},
-        # Graphing calculator
-        "expressions": {"en": "Expressions", "fr": "Expressions", "ar": "التعابير"},
-        "add_expression": {
-            "en": "+ Add expression", "fr": "+ Ajouter une expression", "ar": "+ إضافة تعبير",
-        },
-        "sliders": {"en": "Sliders", "fr": "Curseurs", "ar": "أشرطة التمرير"},
-        "reset_view": {"en": "Reset view", "fr": "Réinitialiser", "ar": "إعادة ضبط"},
-        "clear_all": {"en": "Clear all", "fr": "Tout effacer", "ar": "مسح الكل"},
-        "zoom_in": {"en": "Zoom +", "fr": "Zoom +", "ar": "تكبير +"},
-        "zoom_out": {"en": "Zoom −", "fr": "Zoom −", "ar": "تصغير −"},
-        "examples": {
-            "en": "Examples: y = x^2   |   y = sin(x)   |   x^2 + y^2 = 25   |   a = 3",
-            "fr": "Exemples: y = x^2   |   y = sin(x)   |   x^2 + y^2 = 25   |   a = 3",
-            "ar": "أمثلة: y = x^2   |   y = sin(x)   |   x^2 + y^2 = 25   |   a = 3",
-        },
-    }
-
-    # ── Desmos-style graphing constants ───────────────────────────
-    D2_FUNCS = [
-        "sin", "cos", "tan", "sec", "csc", "cot", "asin", "acos", "atan",
-        "sinh", "cosh", "tanh", "arcsin", "arccos", "arctan",
-        "log", "ln", "exp", "sqrt", "abs", "floor", "ceil", "sign",
-        "round", "min", "max", "mod", "gcd", "lcm", "nthroot",
-    ]
-    D2_COLORS = [
-        "#2563eb", "#dc2626", "#16a34a", "#9333ea",
-        "#ea580c", "#0891b2", "#db2777", "#65a30d",
-    ]
-
-    # ── Units ─────────────────────────────────────────────────────
-    UNITS = {
-        "Weight": {
-            "en": {"Kilogram (kg)": 1.0, "Gram (g)": 1000.0, "Milligram (mg)": 1_000_000.0,
-                   "Tonne (t)": 0.001, "Pound (lb)": 2.20462, "Ounce (oz)": 35.274},
-            "fr": {"Kilogramme (kg)": 1.0, "Gramme (g)": 1000.0, "Milligramme (mg)": 1_000_000.0,
-                   "Tonne (t)": 0.001, "Livre (lb)": 2.20462, "Once (oz)": 35.274},
-            "ar": {"كيلوغرام (kg)": 1.0, "غرام (g)": 1000.0, "مليغرام (mg)": 1_000_000.0,
-                   "طن (t)": 0.001, "رطل (lb)": 2.20462, "أونصة (oz)": 35.274},
-        },
-        "Currency": {
-            "en": {"US Dollar (USD)": 1.0, "Euro (EUR)": 0.92, "British Pound (GBP)": 0.79,
-                   "Japanese Yen (JPY)": 149.50, "Canadian Dollar (CAD)": 1.36,
-                   "Australian Dollar (AUD)": 1.53, "Swiss Franc (CHF)": 0.88,
-                   "Chinese Yuan (CNY)": 7.24, "Indian Rupee (INR)": 83.50,
-                   "Algerian Dinar (DZD)": 134.50, "Moroccan Dirham (MAD)": 9.90,
-                   "Tunisian Dinar (TND)": 3.10},
-            "fr": {"Dollar américain (USD)": 1.0, "Euro (EUR)": 0.92, "Livre sterling (GBP)": 0.79,
-                   "Yen japonais (JPY)": 149.50, "Dollar canadien (CAD)": 1.36,
-                   "Dollar australien (AUD)": 1.53, "Franc suisse (CHF)": 0.88,
-                   "Yuan chinois (CNY)": 7.24, "Roupie indienne (INR)": 83.50,
-                   "Dinar algérien (DZD)": 134.50, "Dirham marocain (MAD)": 9.90,
-                   "Dinar tunisien (TND)": 3.10},
-            "ar": {"دولار أمريكي (USD)": 1.0, "يورو (EUR)": 0.92, "جنيه إسترليني (GBP)": 0.79,
-                   "ين ياباني (JPY)": 149.50, "دولار كندي (CAD)": 1.36,
-                   "دولار أسترالي (AUD)": 1.53, "فرنك سويسري (CHF)": 0.88,
-                   "يوان صيني (CNY)": 7.24, "روبية هندية (INR)": 83.50,
-                   "دinar جزائري (DZD)": 134.50, "درهم مغربي (MAD)": 9.90,
-                   "دinar تونسي (TND)": 3.10},
-        },
-        "Volume": {
-            "en": {"Liter (L)": 1.0, "Milliliter (mL)": 1000.0, "Cubic Meter (m³)": 0.001,
-                   "Gallon (US gal)": 0.264172, "Quart (US qt)": 1.05669,
-                   "Pint (US pt)": 2.11338, "Cup (US)": 4.22675,
-                   "Fluid Ounce (US fl oz)": 33.814},
-            "fr": {"Litre (L)": 1.0, "Millilitre (mL)": 1000.0, "Mètre cube (m³)": 0.001,
-                   "Gallon (US gal)": 0.264172, "Quart (US qt)": 1.05669,
-                   "Pinte (US pt)": 2.11338, "Tasse (US)": 4.22675,
-                   "Once liquide (US fl oz)": 33.814},
-            "ar": {"لتر (L)": 1.0, "مليلتر (mL)": 1000.0, "متر مكعب (m³)": 0.001,
-                   "غالون (US gal)": 0.264172, "كوارت (US qt)": 1.05669,
-                   "باينت (US pt)": 2.11338, "كوب (US)": 4.22675,
-                   "أونصة سائلة (US fl oz)": 33.814},
-        },
-        "Area": {
-            "en": {"Square Meter (m²)": 1.0, "Square Centimeter (cm²)": 10000.0,
-                   "Square Millimeter (mm²)": 1_000_000.0, "Square Kilometer (km²)": 0.000001,
-                   "Square Foot (ft²)": 10.7639, "Square Inch (in²)": 1550.0,
-                   "Hectare (ha)": 0.0001, "Acre": 0.000247105},
-            "fr": {"Mètre carré (m²)": 1.0, "Centimètre carré (cm²)": 10000.0,
-                   "Millimètre carré (mm²)": 1_000_000.0, "Kilomètre carré (km²)": 0.000001,
-                   "Pied carré (ft²)": 10.7639, "Pouce carré (in²)": 1550.0,
-                   "Hectare (ha)": 0.0001, "Acre": 0.000247105},
-            "ar": {"متر مربع (m²)": 1.0, "سنتيمتر مربع (cm²)": 10000.0,
-                   "مليمتر مربع (mm²)": 1_000_000.0, "كيلومتر مربع (km²)": 0.000001,
-                   "قدم مربع (ft²)": 10.7639, "بوصة مربعة (in²)": 1550.0,
-                   "هكتار (ha)": 0.0001, "فدان": 0.000247105},
-        },
-        "Distance": {
-            "en": {"Kilometer (km)": 1.0, "Meter (m)": 1000.0, "Centimeter (cm)": 100000.0,
-                   "Millimeter (mm)": 1_000_000.0, "Mile (mi)": 0.621371,
-                   "Yard (yd)": 1093.61, "Foot (ft)": 3280.84, "Inch (in)": 39370.1,
-                   "Nautical Mile (nmi)": 0.539957},
-            "fr": {"Kilomètre (km)": 1.0, "Mètre (m)": 1000.0, "Centimètre (cm)": 100000.0,
-                   "Millimètre (mm)": 1_000_000.0, "Mile (mi)": 0.621371,
-                   "Yard (yd)": 1093.61, "Pied (ft)": 3280.84, "Pouce (in)": 39370.1,
-                   "Mille marin (nmi)": 0.539957},
-            "ar": {"كيلومتر (km)": 1.0, "متر (m)": 1000.0, "سنتيمتر (cm)": 100000.0,
-                   "مليمتر (mm)": 1_000_000.0, "ميل (mi)": 0.621371,
-                   "ياردة (yd)": 1093.61, "قدم (ft)": 3280.84, "بوصة (in)": 39370.1,
-                   "ميل بحري (nmi)": 0.539957},
-        },
-    }
-
+class ScientificCalculatorApp:
     def __init__(self, root):
         self.root = root
+        self.theme = Theme()
+        self.fonts = self.theme.fonts()
         self.lang = "fr"
+        self.engine = Engine(angle_mode="rad")
+        self.memory = 0.0
+        self.last_answer = None
+        self.history = []
+        self.angle_mode = "rad"
+        self.mode_var = tk.StringVar(value="RAD")
 
-        self.root.title(self._t("app_title"))
-        self.root.geometry("760x960")
+        self._create_views()
+        self._build_header()
+        self.calculator.build()
+
+    # ── Translation helper ──────────────────────────────────────────
+    def t(self, key):
+        return translate(key, self.lang)
+
+    # ── Shared helpers used by the views ───────────────────────────
+    def add_hover(self, widget, normal, hover):
+        widget.bind("<Enter>", lambda e: widget.configure(bg=hover))
+        widget.bind("<Leave>", lambda e: widget.configure(bg=normal))
+
+    def set_answer(self, value):
+        self.last_answer = value
+        self.calculator.ans_var.set(format_number(value))
+
+    def add_history(self, expression, result):
+        self.history.append((expression, format_number(result)))
+        if len(self.history) > 200:
+            self.history.pop(0)
+        self.calculator._refresh_history()
+
+    def show_error(self, message):
+        """Show a transient error banner under the display."""
+        if hasattr(self, "_error_label"):
+            try:
+                self._error_label.destroy()
+            except Exception:
+                pass
+        self._error_label = tk.Label(
+            self.root, text=message, bg=self.theme.CLEAR, fg=self.theme.CLEAR_T,
+            font=self.fonts["footer"], anchor="w", padx=10, pady=4)
+        self._error_label.pack(fill="x", padx=24, pady=(0, 8))
+        self.root.after(4000, self._hide_error)
+
+    def _hide_error(self):
+        if hasattr(self, "_error_label"):
+            try:
+                self._error_label.destroy()
+            except Exception:
+                pass
+            del self._error_label
+
+    def toggle_angle_mode(self):
+        self.angle_mode = "rad" if self.angle_mode == "deg" else "deg"
+        self.engine.set_angle_mode(self.angle_mode)
+        self.mode_var.set(self.angle_mode.upper())
+
+    # ── Header / toolbar ───────────────────────────────────────────
+    def _build_header(self):
+        th = self.theme
+        self.root.title(f"{self.t('app_title')} {VERSION}")
+        self.root.geometry("1080x760")
         self.root.resizable(True, True)
-        self.root.minsize(660, 760)
+        self.root.minsize(880, 640)
+        self.root.configure(bg=th.BG)
 
-        # ── Sweet & Modern Color Palette ──────────────────────────
-        self.C_BG        = "#f8fafc"
-        self.C_CARD      = "#ffffff"
-        self.C_DISPLAY   = "#0f172a"
-        self.C_TEXT      = "#0f172a"
-        self.C_TEXT_DIM  = "#64748b"
-        self.C_NUM       = "#f1f5f9"
-        self.C_NUM_H     = "#e2e8f0"
-        self.C_OP        = "#818cf8"
-        self.C_OP_H      = "#6366f1"
-        self.C_FUNC      = "#f0fdf4"
-        self.C_FUNC_H    = "#d1fae5"
-        self.C_FUNC_T    = "#059669"
-        self.C_MEM       = "#fffbeb"
-        self.C_MEM_H     = "#fef3c7"
-        self.C_MEM_T     = "#d97706"
-        self.C_CLEAR     = "#fee2e2"
-        self.C_CLEAR_H   = "#fecaca"
-        self.C_CLEAR_T   = "#b91c1c"
-        self.C_EQUAL     = "#818cf8"
-        self.C_EQUAL_H   = "#6366f1"
-        self.C_ACCENT    = "#c084fc"
-        self.C_CONVERT   = "#fce7f3"
-        self.C_CONVERT_T = "#be185d"
-        self.C_EQUATION  = "#fff7ed"
-        self.C_EQUATION_T= "#c2410c"
-        self.C_GRAPH     = "#f0f9ff"
-        self.C_GRAPH_T   = "#0c4a6e"
-        self.C_FORMULA   = "#f0fdf4"
-        self.C_FORMULA_T = "#059669"
-
-        # State
-        self.expression = ""
-        self.memory = 0
-        self.deg_mode = True
-        self.new_input = True
-
-        # Desmos-style graphing state
-        self.d2_exprs = []
-        self.d2_next_id = 1
-        self.d2_x0 = 0.0          # world x at screen center
-        self.d2_y0 = 0.0          # world y at screen center
-        self.d2_scale = 50.0      # pixels per world unit
-        self.d2_sliders = {}      # name -> {expr_id, value, min, max, scale_widget}
-        self.d2_updating = False
-        self.d2_drag = None
-        self.d2_hover = None
-
-        # Fonts
-        self.f_display = tkfont.Font(family="Segoe UI", size=32, weight="bold")
-        self.f_expr    = tkfont.Font(family="Segoe UI", size=13)
-        self.f_btn     = tkfont.Font(family="Segoe UI", size=12, weight="bold")
-        self.f_btn_s   = tkfont.Font(family="Segoe UI", size=10, weight="bold")
-        self.f_mode    = tkfont.Font(family="Segoe UI", size=10, weight="bold")
-        self.f_footer  = tkfont.Font(family="Segoe UI", size=9)
-        self.f_conv    = tkfont.Font(family="Segoe UI", size=11, weight="bold")
-        self.f_eq      = tkfont.Font(family="Segoe UI", size=11, weight="bold")
-        self.f_graph   = tkfont.Font(family="Segoe UI", size=11, weight="bold")
-        self.f_formula = tkfont.Font(family="Segoe UI", size=11, weight="bold")
-
-        self._build_ui()
-        self._bind_keys()
-
-    # ------------------------------------------------------------------ Helpers
-    def _t(self, key):
-        return self.TR.get(key, {}).get(self.lang, self.TR.get(key, {}).get("en", key))
-
-    def _on_lang_change(self, val):
-        self.lang = val
-        self.lang_var.set(val)
-        self._rebuild_ui()
-
-    def _rebuild_ui(self):
-        for widget in self.root.winfo_children():
-            widget.destroy()
-        self._build_ui()
-
-    # ------------------------------------------------------------------ UI
-    def _build_ui(self):
-        self.root.configure(bg=self.C_BG)
-
-        top = tk.Frame(self.root, bg=self.C_BG, height=60)
-        top.pack(fill="x", padx=20, pady=(15, 10))
+        # Row 1 : language | title | angle mode
+        top = tk.Frame(self.root, bg=th.BG, height=56)
+        top.pack(fill="x", padx=20, pady=(16, 6))
         top.pack_propagate(False)
 
-        left_frame = tk.Frame(top, bg=self.C_BG)
-        left_frame.pack(side="left", fill="y")
-
         self.lang_var = tk.StringVar(value=self.lang)
-        tk.Label(left_frame, text=self._t("language") + ":", bg=self.C_BG,
-                 fg=self.C_TEXT_DIM, font=self.f_mode).pack(side="left", padx=(0, 8))
+        for code, label in LANGUAGES:
+            tk.Radiobutton(
+                top, text=label, variable=self.lang_var, value=code,
+                bg=th.BG, fg=th.TEXT, selectcolor=th.CARD, font=self.fonts["mode"],
+                activebackground=th.BG, activeforeground=th.TEXT,
+                command=lambda c=code: self.set_language(c),
+                bd=0, highlightthickness=0, padx=6).pack(side="left", padx=(0, 4))
 
-        for lang_code, lang_label in [("fr", "Fr"), ("en", "En"), ("ar", "Ar")]:
-            rb = tk.Radiobutton(
-                left_frame, text=lang_label, variable=self.lang_var, value=lang_code,
-                bg=self.C_BG, fg=self.C_TEXT, selectcolor=self.C_CARD,
-                font=self.f_mode, activebackground=self.C_BG,
-                activeforeground=self.C_TEXT, command=lambda c=lang_code: self._on_lang_change(c),
-                bd=0, highlightthickness=0, padx=6,
-            )
-            rb.pack(side="left", padx=(0, 6))
+        tk.Label(top, text=self.t("app_title"), bg=th.BG, fg=th.TEXT,
+                 font=self.fonts["btn"], anchor="center").pack(side="left",
+                                                                expand=True, fill="x")
 
-        title_label = tk.Label(top, text=self._t("app_title"), bg=self.C_BG,
-                               fg=self.C_TEXT, font=self.f_btn, anchor="center")
-        title_label.pack(side="left", expand=True, fill="x")
+        self.mode_var = tk.StringVar(value=self.angle_mode.upper())
+        tk.Label(top, textvariable=self.mode_var, bg=th.BG, fg=th.ACCENT,
+                 font=self.fonts["mode"]).pack(side="right")
 
-        right_frame = tk.Frame(top, bg=self.C_BG)
-        right_frame.pack(side="right")
+        # Row 2 : module buttons
+        bar = tk.Frame(self.root, bg=th.BG, height=44)
+        bar.pack(fill="x", padx=20, pady=(0, 10))
+        bar.pack_propagate(False)
 
-        self.mode_label = tk.Label(right_frame, text="DEG", bg=self.C_BG,
-                                   fg=self.C_ACCENT, font=self.f_mode)
-        self.mode_label.pack(side="right", padx=(12, 0))
-
-        for text_key, cmd, bg, fg in [
-            ("converter", self.open_converter, self.C_CONVERT, self.C_CONVERT_T),
-            ("equations", self.open_equation_solver, self.C_EQUATION, self.C_EQUATION_T),
-            ("grapher", self.open_desmos, self.C_GRAPH, self.C_GRAPH_T),
-            ("formulas", self.open_formulas, self.C_FORMULA, self.C_FORMULA_T),
-        ]:
-            b = tk.Button(
-                right_frame, text=self._t(text_key), command=cmd,
-                bg=bg, fg=fg, activebackground=fg, activeforeground="#ffffff",
-                font=self.f_mode, bd=0, relief="flat", cursor="hand2",
-                highlightthickness=0, padx=14, pady=8,
-            )
-            b.pack(side="right", padx=(8, 0))
-
-        # Expression preview
-        self.expr_var = tk.StringVar(value="")
-        tk.Label(self.root, textvariable=self.expr_var, bg=self.C_DISPLAY,
-                 fg=self.C_TEXT_DIM, font=self.f_expr, anchor="e").pack(
-            fill="x", padx=24, pady=(0, 4))
-
-        # Main display card
-        display_card = tk.Frame(self.root, bg=self.C_DISPLAY, bd=0)
-        display_card.pack(fill="x", padx=24, pady=(0, 24))
-
-        self.display_var = tk.StringVar(value="0")
-        display = tk.Entry(display_card, textvariable=self.display_var,
-                           font=self.f_display, bg=self.C_DISPLAY, fg="#ffffff",
-                           insertbackground="#ffffff", bd=0, justify="right",
-                           readonlybackground=self.C_DISPLAY)
-        display.pack(fill="x", padx=20, pady=20)
-        display.configure(state="readonly")
-
-        # Calculator button grid card
-        btn_card = tk.Frame(self.root, bg=self.C_CARD, bd=0)
-        btn_card.pack(padx=16, pady=(0, 14), fill="x")
-        btn_frame = tk.Frame(btn_card, bg=self.C_CARD)
-        btn_frame.pack(padx=14, pady=14)
-
-        buttons = [
-            [("MC", "mem"), ("MR", "mem"), ("M+", "mem"), ("M-", "mem")],
-            [("DEG/RAD", "func"), ("(", "func"), (")", "func"), ("AC", "clear")],
-            [("2nd", "func"), ("x²", "func"), ("xⁿ", "op"), ("÷", "op")],
-            [("7", "num"), ("8", "num"), ("9", "num"), ("×", "op")],
-            [("4", "num"), ("5", "num"), ("6", "num"), ("−", "op")],
-            [("1", "num"), ("2", "num"), ("3", "num"), ("+", "op")],
-            [("0", "num"), (".", "num"), ("=", "equal")],
+        modules = [
+            ("converter", self.converter.open, th.CONVERT, th.CONVERT_T),
+            ("equations", self.equations.open, th.EQUATION, th.EQUATION_T),
+            ("grapher", self.grapher.open, th.GRAPH, th.GRAPH_T),
+            ("formulas", self.formulas.open, th.FORMULA, th.FORMULA_T),
+            ("matrices", self.matrices.open, th.MATRIX, th.MATRIX_T),
+            ("calculus", self.calculus.open, th.CALCULUS, th.CALCULUS_T),
+            ("statistics", self.statistics.open, th.STATS, th.STATS_T),
         ]
-        commands = {
-            "MC": self.mc, "MR": self.mr, "M+": self.m_add, "M-": self.m_sub,
-            "DEG/RAD": self.toggle_deg_rad,
-            "(": lambda: self._add_char("("), ")": lambda: self._add_char(")"),
-            "AC": self.clear_all, "2nd": self._noop,
-            "x²": lambda: self._math_func("square"),
-            "xⁿ": lambda: self._add_char("**"),
-            "÷": lambda: self._add_operator("/"),
-            "×": lambda: self._add_operator("*"),
-            "−": lambda: self._add_operator("-"),
-            "+": lambda: self._add_operator("+"),
-            "=": self.calculate,
-        }
-        for d in "0123456789.":
-            commands[d] = lambda digit=d: self._add_digit(digit)
+        for key, command, bg, fg in modules:
+            tk.Button(bar, text=self.t(key), command=command, bg=bg, fg=fg,
+                      activebackground=fg, activeforeground="#ffffff",
+                      font=self.fonts["mode"], bd=0, relief="flat", cursor="hand2",
+                      highlightthickness=0, padx=14, pady=7).pack(side="left",
+                                                                  padx=(0, 8))
 
-        styles = {
-            "num":   {"bg": self.C_NUM,   "fg": self.C_TEXT,     "active": self.C_NUM_H,    "hover": self.C_NUM_H},
-            "op":    {"bg": self.C_OP,    "fg": "#ffffff",       "active": self.C_OP_H,    "hover": self.C_OP_H},
-            "equal": {"bg": self.C_EQUAL, "fg": "#ffffff",       "active": self.C_EQUAL_H, "hover": self.C_EQUAL_H},
-            "clear": {"bg": self.C_CLEAR, "fg": self.C_CLEAR_T,  "active": self.C_CLEAR_H, "hover": self.C_CLEAR_H},
-            "mem":   {"bg": self.C_MEM,   "fg": self.C_MEM_T,    "active": self.C_MEM_H,   "hover": self.C_MEM_H},
-            "func":  {"bg": self.C_FUNC,  "fg": self.C_FUNC_T,   "active": self.C_FUNC_H,  "hover": self.C_FUNC_H},
-        }
-
-        for row in buttons:
-            r_frame = tk.Frame(btn_frame, bg=self.C_CARD)
-            r_frame.pack(fill="x", pady=4)
-            for text, style_class in row:
-                cmd = commands.get(text, lambda: None)
-                s = styles[style_class]
-                colspan = 2 if text == "0" else 1
-                btn = tk.Button(r_frame, text=text, command=cmd, font=self.f_btn,
-                                bg=s["bg"], fg=s["fg"], activebackground=s["active"],
-                                activeforeground=s["fg"], bd=0, relief="flat",
-                                cursor="hand2", highlightthickness=0)
-                if colspan == 2:
-                    btn.pack(side="left", fill="both", expand=True, padx=(0, 6))
-                else:
-                    btn.pack(side="left", fill="both", expand=True, padx=3)
-                self._add_hover(btn, s["bg"], s["hover"])
-
-        # Scientific panel
-        tk.Label(self.root, text=self._t("scientific"), bg=self.C_BG,
-                 fg=self.C_TEXT_DIM, font=self.f_mode, anchor="w").pack(
-            fill="x", padx=24, pady=(16, 6))
-
-        sci_card = tk.Frame(self.root, bg=self.C_CARD, bd=0)
-        sci_card.pack(padx=16, pady=(0, 14), fill="x")
-        sci_frame = tk.Frame(sci_card, bg=self.C_CARD)
-        sci_frame.pack(padx=14, pady=14)
-
-        sci_buttons = [
-            [("sin", "sin"), ("cos", "cos"), ("tan", "tan"), ("log", "log10")],
-            [("ln", "ln"), ("√x", "sqrt"), ("x!", "factorial"), ("π", "pi")],
-            [("eˣ", "exp"), ("10ˣ", "pow10"), ("mod", "mod"), ("±", "neg")],
-        ]
-        for row in sci_buttons:
-            r_frame = tk.Frame(sci_frame, bg=self.C_CARD)
-            r_frame.pack(fill="x", pady=4)
-            for text, func_name in row:
-                btn = tk.Button(r_frame, text=text,
-                                command=lambda f=func_name: self._sci_func(f),
-                                font=self.f_btn_s, bg=self.C_FUNC, fg=self.C_FUNC_T,
-                                activebackground=self.C_FUNC_H, activeforeground=self.C_FUNC_T,
-                                bd=0, relief="flat", cursor="hand2", highlightthickness=0)
-                btn.pack(side="left", fill="both", expand=True, padx=3)
-                self._add_hover(btn, self.C_FUNC, self.C_FUNC_H)
-
-        footer = tk.Frame(self.root, bg=self.C_BG, height=30)
-        footer.pack(fill="x", side="bottom", pady=(0, 14))
+        # Footer
+        footer = tk.Frame(self.root, bg=th.BG, height=26)
+        footer.pack(fill="x", side="bottom", pady=(0, 8))
         footer.pack_propagate(False)
-        tk.Label(footer, text=self._t("copyright"), bg=self.C_BG,
-                 fg=self.C_TEXT_DIM, font=self.f_footer).pack(side="right")
+        tk.Label(footer, text=self.t("copyright"), bg=th.BG, fg=th.TEXT_DIM,
+                 font=self.fonts["footer"]).pack(side="right")
 
-    # ==================================================================
-    # DESMOS-STYLE GRAPHING CALCULATOR
-    # ==================================================================
-    def open_desmos(self):
-        win = tk.Toplevel(self.root)
-        win.title(self._t("graph_title"))
-        win.geometry("1180x760")
-        win.resizable(True, True)
-        win.minsize(900, 600)
-        win.configure(bg=self.C_BG)
-        win.transient(self.root)
-        win.grab_set()
-        self.d2_win = win
-
-        # ── Header ──
-        header = tk.Frame(win, bg=self.C_BG, height=56)
-        header.pack(fill="x", padx=16, pady=(14, 6))
-        header.pack_propagate(False)
-
-        tk.Label(header, text=self._t("graph_title"), bg=self.C_BG, fg=self.C_TEXT,
-                 font=tkfont.Font(family="Segoe UI", size=17, weight="bold")).pack(side="left")
-
-        tk.Button(header, text="✕", command=win.destroy, bg=self.C_BG,
-                  fg=self.C_TEXT_DIM, font=self.f_btn, bd=0, relief="flat",
-                  cursor="hand2").pack(side="right")
-
-        tk.Button(header, text=self._t("clear_all"), command=self._d2_clear_all,
-                  bg=self.C_CLEAR, fg=self.C_CLEAR_T, activebackground=self.C_CLEAR_T,
-                  activeforeground="#ffffff", font=self.f_mode, bd=0, relief="flat",
-                  cursor="hand2", highlightthickness=0, padx=14, pady=7).pack(side="right", padx=(8, 0))
-
-        tk.Button(header, text=self._t("reset_view"), command=self._d2_reset_view,
-                  bg=self.C_GRAPH, fg=self.C_GRAPH_T, activebackground=self.C_GRAPH_T,
-                  activeforeground="#ffffff", font=self.f_mode, bd=0, relief="flat",
-                  cursor="hand2", highlightthickness=0, padx=14, pady=7).pack(side="right", padx=(8, 0))
-
-        # ── Body ──
-        body = tk.Frame(win, bg=self.C_BG)
-        body.pack(fill="both", expand=True, padx=16, pady=(0, 14))
-
-        # Left panel — expressions + sliders
-        panel = tk.Frame(body, bg=self.C_CARD, width=330, highlightthickness=1,
-                         highlightbackground="#e2e8f0")
-        panel.pack(side="left", fill="y")
-        panel.pack_propagate(False)
-
-        expr_holder = tk.Frame(panel, bg=self.C_CARD)
-        expr_holder.pack(fill="both", expand=True, padx=12, pady=(12, 6))
-
-        tk.Label(expr_holder, text=self._t("expressions"), bg=self.C_CARD,
-                 fg=self.C_TEXT_DIM, font=self.f_mode, anchor="w").pack(fill="x", pady=(0, 8))
-
-        self.d2_expr_box = tk.Frame(expr_holder, bg=self.C_CARD)
-        self.d2_expr_box.pack(fill="x")
-
-        tk.Button(expr_holder, text=self._t("add_expression"),
-                  command=lambda: self._d2_add_expr(self.d2_expr_box),
-                  bg=self.C_GRAPH, fg=self.C_GRAPH_T, activebackground=self.C_GRAPH_T,
-                  activeforeground="#ffffff", font=self.f_mode, bd=0, relief="flat",
-                  cursor="hand2", highlightthickness=0, padx=12, pady=7).pack(fill="x", pady=(10, 0))
-
-        tk.Label(expr_holder, text=self._t("examples"), bg=self.C_CARD,
-                 fg=self.C_TEXT_DIM, font=self.f_footer, anchor="w",
-                 wraplength=290, justify="left").pack(fill="x", pady=(12, 0))
-
-        # Sliders section
-        tk.Label(panel, text=self._t("sliders"), bg=self.C_CARD, fg=self.C_TEXT_DIM,
-                 font=self.f_mode, anchor="w").pack(fill="x", padx=12, pady=(8, 4))
-        self.d2_slider_box = tk.Frame(panel, bg=self.C_CARD)
-        self.d2_slider_box.pack(fill="x", padx=12, pady=(0, 12))
-
-        # Right — canvas
-        right = tk.Frame(body, bg=self.C_BG)
-        right.pack(side="left", fill="both", expand=True, padx=(12, 0))
-
-        canvas_card = tk.Frame(right, bg=self.C_CARD, highlightthickness=1,
-                                highlightbackground="#e2e8f0")
-        canvas_card.pack(fill="both", expand=True)
-
-        self.d2_canvas = tk.Canvas(canvas_card, bg="#ffffff", highlightthickness=0,
-                                   width=820, height=600, cursor="crosshair")
-        self.d2_canvas.pack(fill="both", expand=True, padx=8, pady=8)
-
-        self.d2_canvas.bind("<ButtonPress-1>", self._d2_on_press)
-        self.d2_canvas.bind("<B1-Motion>", self._d2_on_drag)
-        self.d2_canvas.bind("<ButtonRelease-1>", self._d2_on_release)
-        self.d2_canvas.bind("<MouseWheel>", self._d2_on_wheel)
-        self.d2_canvas.bind("<Motion>", self._d2_on_motion)
-        self.d2_canvas.bind("<Leave>", lambda e: self._d2_set_hover(None))
-
-        # Bottom toolbar: zoom buttons + coordinate readout
-        bottom = tk.Frame(right, bg=self.C_BG, height=40)
-        bottom.pack(fill="x", pady=(8, 0))
-
-        self.d2_coord_label = tk.Label(bottom, text="", bg=self.C_BG, fg=self.C_TEXT_DIM,
-                                       font=self.f_footer, anchor="w")
-        self.d2_coord_label.pack(side="left")
-
-        tk.Button(bottom, text=self._t("zoom_in"), command=lambda: self._d2_zoom(1.25),
-                  bg=self.C_GRAPH, fg=self.C_GRAPH_T, activebackground=self.C_GRAPH_T,
-                  activeforeground="#ffffff", font=self.f_mode, bd=0, relief="flat",
-                  cursor="hand2", highlightthickness=0, padx=12, pady=5).pack(side="right")
-
-        tk.Button(bottom, text=self._t("zoom_out"), command=lambda: self._d2_zoom(0.8),
-                  bg=self.C_GRAPH, fg=self.C_GRAPH_T, activebackground=self.C_GRAPH_T,
-                  activeforeground="#ffffff", font=self.f_mode, bd=0, relief="flat",
-                  cursor="hand2", highlightthickness=0, padx=12, pady=5).pack(side="right", padx=(8, 0))
-
-        # Seed with example expressions
-        self._d2_add_expr(self.d2_expr_box, "y = x^2", color=self.D2_COLORS[0])
-        self._d2_add_expr(self.d2_expr_box, "a = 3", color=self.D2_COLORS[1])
-        self._d2_add_expr(self.d2_expr_box, "y = a*sin(x)", color=self.D2_COLORS[2])
-
-        win.after(150, self._d2_draw)
-
-    # ---------------------------------------------------------- Expression rows
-    def _d2_add_expr(self, holder, text="", color=None):
-        eid = self.d2_next_id
-        self.d2_next_id += 1
-        if color is None:
-            color = self.D2_COLORS[(eid - 1) % len(self.D2_COLORS)]
-
-        var = tk.StringVar(value=text)
-        row = tk.Frame(holder, bg=self.C_CARD)
-        row.pack(fill="x", pady=3)
-
-        dot = tk.Canvas(row, width=20, height=20, bg=self.C_CARD, highlightthickness=0)
-        dot.create_oval(3, 3, 17, 17, fill=color, outline="")
-        dot.pack(side="left")
-
-        ent = tk.Entry(row, textvariable=var, font=self.f_btn, bg="#f8fafc",
-                       fg=self.C_TEXT, bd=0, insertbackground=self.C_TEXT)
-        ent.pack(side="left", fill="x", expand=True, padx=8)
-
-        tk.Button(row, text="✕", command=lambda: self._d2_remove_expr(eid),
-                  bg=self.C_CARD, fg=self.C_TEXT_DIM, activebackground=self.C_CARD,
-                  activeforeground=self.C_CLEAR_T, font=self.f_mode, bd=0,
-                  relief="flat", cursor="hand2").pack(side="right")
-
-        self.d2_exprs.append({"id": eid, "var": var, "color": color,
-                               "row": row, "ent": ent})
-
-        def on_change(*args):
-            self._d2_sync_sliders()
-            self._d2_draw()
-        var.trace_add("write", on_change)
-
-        self._d2_sync_sliders()
-        self._d2_draw()
-        return eid
-
-    def _d2_remove_expr(self, eid):
-        for i, e in enumerate(self.d2_exprs):
-            if e["id"] == eid:
-                e["row"].destroy()
-                self.d2_exprs.pop(i)
-                break
-        self._d2_sync_sliders()
-        self._d2_draw()
-
-    def _d2_clear_all(self):
-        for e in list(self.d2_exprs):
-            e["row"].destroy()
-        self.d2_exprs = []
-        for s in list(self.d2_sliders.values()):
+    # ── Language switching ──────────────────────────────────────────
+    def set_language(self, code):
+        if code == self.lang:
+            return
+        self.lang = code
+        # close every open window
+        for view in (self.grapher, self.converter, self.equations, self.formulas,
+                     self.matrices, self.calculus, self.statistics):
             try:
-                s["frame"].destroy()
+                view.close()
             except Exception:
                 pass
-        self.d2_sliders = {}
-        self._d2_draw()
-
-    def _d2_reset_view(self):
-        self.d2_x0 = 0.0
-        self.d2_y0 = 0.0
-        self.d2_scale = 50.0
-        self._d2_draw()
-
-    # ---------------------------------------------------------- Sliders
-    def _d2_sync_sliders(self):
-        """Detect `name = number` expressions and create/refresh sliders."""
-        found = {}
-        for e in self.d2_exprs:
-            m = re.match(r'^\s*([a-zA-Z_]\w*)\s*=\s*(-?\d+(?:\.\d+)?)\s*$',
-                         e["var"].get())
-            if m:
-                found[m.group(1)] = (float(m.group(2)), e)
-
-        # remove sliders that no longer exist
-        for name in list(self.d2_sliders.keys()):
-            if name not in found:
-                s = self.d2_sliders.pop(name)
-                try:
-                    s["frame"].destroy()
-                except Exception:
-                    pass
-
-        # create new sliders
-        for name, (val, e) in found.items():
-            if name not in self.d2_sliders:
-                self._d2_make_slider(name, val, e)
-            else:
-                s = self.d2_sliders[name]
-                s["expr"] = e
-                if not self.d2_updating:
-                    try:
-                        cur = float(s["expr"]["var"].get().split("=")[1].strip())
-                    except Exception:
-                        cur = val
-                    if abs(cur - s["value"]) > 1e-9:
-                        self.d2_updating = True
-                        s["scale"].set(cur)
-                        s["value"] = cur
-                        self.d2_updating = False
-
-    def _d2_make_slider(self, name, val, expr):
-        frame = tk.Frame(self.d2_slider_box, bg=self.C_CARD)
-        frame.pack(fill="x", pady=4)
-
-        lo = min(0.0, val - 5.0)
-        hi = max(10.0, val + 5.0)
-
-        name_lbl = tk.Label(frame, text=name, bg=self.C_CARD, fg=self.C_TEXT,
-                            font=self.f_mode, width=6, anchor="w")
-        name_lbl.pack(side="left")
-
-        val_lbl = tk.Label(frame, text=f"{val:g}", bg=self.C_CARD, fg=self.C_TEXT_DIM,
-                           font=self.f_footer, width=8, anchor="e")
-        val_lbl.pack(side="left", padx=(4, 6))
-
-        scale = ttk.Scale(frame, from_=lo, to=hi, orient="horizontal", length=180)
-        scale.set(val)
-        scale.pack(side="left", fill="x", expand=True)
-
-        state = {"name": name, "value": val, "min": lo, "max": hi,
-                 "scale": scale, "label": val_lbl, "expr": expr, "frame": frame}
-
-        def on_slider(v):
-            if self.d2_updating:
-                return
+        # destroy the whole UI (including the toolbars) and rebuild it
+        for child in self.root.winfo_children():
             try:
-                fv = float(v)
-            except Exception:
-                return
-            state["value"] = fv
-            self.d2_updating = True
-            val_lbl.config(text=f"{fv:.4g}")
-            try:
-                expr["var"].set(f"{name} = {fv:.6g}")
+                child.destroy()
             except Exception:
                 pass
-            self.d2_updating = False
-            self._d2_draw()
-
-        scale.configure(command=on_slider)
-        self.d2_sliders[name] = state
-
-    # ---------------------------------------------------------- Expression parsing
-    def _d2_to_python(self, expr):
-        """Convert a Desmos-like expression into a Python-evaluable string."""
-        s = expr.strip()
-        s = s.replace('^', '**')
-        s = s.replace('√', 'sqrt')
-        s = s.replace('π', 'pi')
-        s = s.replace('×', '*').replace('÷', '/').replace('−', '-')
-        # Unicode superscripts -> Python power operator
-        s = s.replace('²', '**2').replace('³', '**3').replace('¹', '**1')
-        s = s.replace('⁴', '**4').replace('⁵', '**5').replace('⁶', '**6')
-
-        # ── Implicit multiplication ──
-        # 1) digit directly before a function name:  2sin(x) -> 2*sin(x)
-        fn_alt = "|".join(self.D2_FUNCS)
-        s = re.sub(r'(\d)(?=(?:%s)\b)' % fn_alt, r'\1*', s, flags=re.IGNORECASE)
-
-        # 2) Protect function names with control-char placeholders so the
-        #    generic rules below cannot split them apart.
-        #    (?<![a-zA-Z_]) allows a digit before the name but not a letter.
-        for i, fn in enumerate(self.D2_FUNCS):
-            s = re.sub(r'(?<![a-zA-Z_])' + fn + r'\b', "\x01%d\x01" % i, s,
-                       flags=re.IGNORECASE)
-
-        # 3) Generic implicit multiplication rules
-        s = re.sub(r'(\d)(?=[a-zA-Z(])', r'\1*', s)     # 2x  2(x)
-        s = re.sub(r'(\))(?=[a-zA-Z(])', r'\1*', s)       # )( )x
-        s = re.sub(r'([a-zA-Z])(?=[a-zA-Z])', r'\1*', s)  # xy
-        s = re.sub(r'([a-zA-Z])(?=\()', r'\1*', s)        # x(
-        s = re.sub(r'([a-zA-Z])(?=\x01)', r'\1*', s)      # x followed by func
-
-        # 4) Restore function names
-        for i, fn in enumerate(self.D2_FUNCS):
-            s = s.replace("\x01%d\x01" % i, fn)
-        return s
-
-    def _d2_namespace(self):
-        ns = {
-            "sin": math.sin, "cos": math.cos, "tan": math.tan,
-            "sec": lambda v: 1 / math.cos(v), "csc": lambda v: 1 / math.sin(v),
-            "cot": lambda v: 1 / math.tan(v),
-            "asin": math.asin, "acos": math.acos, "atan": math.atan,
-            "arcsin": math.asin, "arccos": math.acos, "arctan": math.atan,
-            "sinh": math.sinh, "cosh": math.cosh, "tanh": math.tanh,
-            "log": math.log10, "ln": math.log, "exp": math.exp,
-            "sqrt": math.sqrt, "abs": abs, "floor": math.floor,
-            "ceil": math.ceil, "sign": lambda v: (v > 0) - (v < 0),
-            "round": round, "min": min, "max": max,
-            "mod": lambda a, b: a % b, "gcd": math.gcd, "lcm": math.lcm,
-            "pi": math.pi, "e": math.e,
-        }
-        # slider values become variables usable in other expressions
-        for name, s in self.d2_sliders.items():
-            ns[name] = s["value"]
-        return ns
-
-    # ---------------------------------------------------------- Drawing
-    def _d2_nice_step(self, scale):
-        target = 70.0 / scale
-        if target <= 0:
-            target = 1.0
-        exp = math.floor(math.log10(target))
-        base = 10.0 ** exp
-        for m in (1, 2, 5, 10):
-            if base * m >= target:
-                return base * m
-        return base * 10
-
-    def _d2_fmt_num(self, v):
-        if v == 0:
-            return "0"
-        if abs(v) < 1e-10 or abs(v) >= 1e6:
-            return f"{v:.3g}"
-        if abs(v - round(v)) < 1e-10:
-            return str(int(round(v)))
-        return f"{v:.3g}".rstrip("0").rstrip(".")
-
-    def _d2_draw(self):
-        canvas = getattr(self, "d2_canvas", None)
-        if canvas is None:
-            return
-        try:
-            canvas.delete("all")
-            canvas.update_idletasks()
-            W = canvas.winfo_width()
-            H = canvas.winfo_height()
-        except Exception:
-            return
-        if W < 20 or H < 20:
-            return
-
-        cx, cy = W / 2.0, H / 2.0
-        sc = self.d2_scale
-        x0, y0 = self.d2_x0, self.d2_y0
-
-        def sx(wx):
-            return cx + (wx - x0) * sc
-
-        def sy(wy):
-            return cy - (wy - y0) * sc
-
-        def wx_of(px):
-            return x0 + (px - cx) / sc
-
-        def wy_of(py):
-            return y0 + (cy - py) / sc
-
-        # ── Grid ──
-        step = self._d2_nice_step(sc)
-        x_min = wx_of(0)
-        x_max = wx_of(W)
-        y_min = wy_of(H)
-        y_max = wy_of(0)
-
-        gx = math.floor(x_min / step) * step
-        while gx <= x_max:
-            px = sx(gx)
-            canvas.create_line(px, 0, px, H, fill="#f1f5f9")
-            gx += step
-        gy = math.floor(y_min / step) * step
-        while gy <= y_max:
-            py = sy(gy)
-            canvas.create_line(0, py, W, py, fill="#f1f5f9")
-            gy += step
-
-        # ── Axes ──
-        if 0 <= x0 <= W:
-            canvas.create_line(x0, 0, x0, H, fill="#94a3b8", width=2)
-        if 0 <= y0 <= H:
-            canvas.create_line(0, y0, W, y0, fill="#94a3b8", width=2)
-
-        # ── Tick labels ──
-        gx = math.floor(x_min / step) * step
-        while gx <= x_max:
-            px = sx(gx)
-            if abs(px - x0) > 1 and 0 <= px <= W:
-                canvas.create_text(px, y0 + 14, text=self._d2_fmt_num(gx),
-                                   fill="#94a3b8", font=("Segoe UI", 9))
-            gx += step
-        gy = math.floor(y_min / step) * step
-        while gy <= y_max:
-            py = sy(gy)
-            if abs(py - y0) > 1 and 0 <= py <= H:
-                canvas.create_text(x0 - 14, py, text=self._d2_fmt_num(gy),
-                                   fill="#94a3b8", font=("Segoe UI", 9))
-            gy += step
-
-        if 0 <= x0 <= W and 0 <= y0 <= H:
-            canvas.create_text(x0 + 12, y0 + 16, text="0", fill="#64748b",
-                               font=("Segoe UI", 9, "bold"))
-
-        # ── Plot each expression ──
-        ns = self._d2_namespace()
-        for e in self.d2_exprs:
-            raw = e["var"].get().strip()
-            if not raw:
-                continue
-            color = e["color"]
-            try:
-                self._d2_plot_expr(canvas, raw, color, ns, W, H, sx, sy, wx_of, wy_of)
-            except Exception:
-                pass
-
-        # ── Slider handles on the graph ──
-        for name, s in self.d2_sliders.items():
-            hx = sx(s["value"])
-            hy = sy(0)
-            if -20 <= hx <= W + 20 and -20 <= hy <= H + 20:
-                canvas.create_rectangle(hx - 6, hy - 6, hx + 6, hy + 6,
-                                        fill=s["expr"]["color"], outline="#ffffff", width=2)
-                canvas.create_text(hx, hy - 16, text=name, fill=s["expr"]["color"],
-                                   font=("Segoe UI", 10, "bold"))
-
-        # ── Hover coordinate marker ──
-        if self.d2_hover:
-            hx, hy = self.d2_hover
-            wx = wx_of(hx)
-            wy = wy_of(hy)
-            canvas.create_oval(hx - 4, hy - 4, hx + 4, hy + 4, outline="#64748b")
-            self.d2_coord_label.config(
-                text=f"x = {self._d2_fmt_num(wx)}    y = {self._d2_fmt_num(wy)}")
-
-    def _d2_plot_expr(self, canvas, raw, color, ns, W, H, sx, sy, wx_of, wy_of):
-        """Plot one expression: function, vertical line, point, or implicit curve."""
-        # Split on a single '=' that is not part of <=, >=, ==
-        m = re.match(r'^\s*([^=]+?)\s*=\s*(.+?)\s*$', raw)
-        lhs = rhs = None
-        if m and not re.search(r'[<>!=]=[^=]', raw):
-            lhs = m.group(1).strip()
-            rhs = m.group(2).strip()
-
-        # Point syntax: (x, y)
-        pm = re.match(r'^\s*\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)\s*$', raw)
-        if pm:
-            px = sx(float(pm.group(1)))
-            py = sy(float(pm.group(2)))
-            canvas.create_oval(px - 5, py - 5, px + 5, py + 5,
-                               fill=color, outline="#ffffff", width=2)
-            return
-
-        if lhs is not None:
-            # Slider-like assignment: name = number
-            if re.match(r'^[a-zA-Z_]\w*$', lhs) and re.match(r'^-?[\d.]+$', rhs):
-                return  # handled by the slider system
-            # Vertical line: x = 5
-            if lhs == 'x':
-                try:
-                    val = float(rhs)
-                except Exception:
-                    return
-                px = sx(val)
-                if 0 <= px <= W:
-                    canvas.create_line(px, 0, px, H, fill=color, width=2)
-                return
-            # Function: y = ...
-            if lhs == 'y':
-                expr = self._d2_to_python(rhs)
-                self._d2_plot_function(canvas, expr, color, ns, W, H, sx, sy, wx_of)
-                return
-            # Implicit curve: lhs = rhs  ->  lhs - rhs = 0
-            expr = self._d2_to_python(f"({lhs})-({rhs})")
-            self._d2_plot_implicit(canvas, expr, color, ns, W, H, sx, sy, wx_of, wy_of)
-            return
-
-        # Plain expression treated as y = f(x)
-        expr = self._d2_to_python(raw)
-        self._d2_plot_function(canvas, expr, color, ns, W, H, sx, sy, wx_of)
-
-    def _d2_plot_function(self, canvas, expr, color, ns, W, H, sx, sy, wx_of):
-        pts = []
-        step_px = 1
-        for px in range(0, int(W) + 1, step_px):
-            wx = wx_of(px)
-            try:
-                wy = eval(expr, {"__builtins__": {}}, {**ns, "x": wx})
-            except Exception:
-                pts.append(None)   # domain error -> break the curve
-                continue
-            if wy is None:
-                pts.append(None)
-                continue
-            try:
-                wy = float(wy)
-            except Exception:
-                pts.append(None)
-                continue
-            if not math.isfinite(wy):
-                pts.append(None)
-                continue
-            py = sy(wy)
-            if -5000 < py < H + 5000:
-                pts.append((px, py))
-            else:
-                pts.append(None)
-        # Build contiguous segments
-        seg = []
-        for p in pts:
-            if p is None:
-                if len(seg) > 1:
-                    canvas.create_line(*[c for pt in seg for c in pt], fill=color,
-                                       width=2, capstyle=tk.ROUND)
-                seg = []
-            else:
-                seg.append(p)
-        if len(seg) > 1:
-            canvas.create_line(*[c for pt in seg for c in pt], fill=color,
-                               width=2, capstyle=tk.ROUND)
-
-    def _d2_plot_implicit(self, canvas, expr, color, ns, W, H, sx, sy, wx_of, wy_of):
-        """Plot an implicit curve f(x,y) = 0 by scanning for sign changes."""
-        res = 12
-        for gy in range(0, int(H) + 1, res):
-            for gx in range(0, int(W) + 1, res):
-                wx = wx_of(gx)
-                wy = wy_of(gy)
-                try:
-                    v = eval(expr, {"__builtins__": {}}, {**ns, "x": wx, "y": wy})
-                except Exception:
-                    continue
-                if v is None:
-                    continue
-                try:
-                    v = float(v)
-                except Exception:
-                    continue
-                if not math.isfinite(v) or v == 0:
-                    continue
-                for ox, oy in ((res, 0), (0, res), (-res, 0), (0, -res)):
-                    wx2 = wx_of(gx + ox)
-                    wy2 = wy_of(gy + oy)
-                    try:
-                        v2 = eval(expr, {"__builtins__": {}}, {**ns, "x": wx2, "y": wy2})
-                    except Exception:
-                        continue
-                    if v2 is None:
-                        continue
-                    try:
-                        v2 = float(v2)
-                    except Exception:
-                        continue
-                    if not math.isfinite(v2) or v2 == 0:
-                        continue
-                    if (v < 0) != (v2 < 0):
-                        t = v / (v - v2)
-                        ex = gx + ox * t
-                        ey = gy + oy * t
-                        canvas.create_line(gx, gy, ex, ey, fill=color, width=2)
-                        break
-
-    # ---------------------------------------------------------- Mouse interaction
-    def _d2_world(self, px, py):
-        canvas = self.d2_canvas
-        W = canvas.winfo_width()
-        H = canvas.winfo_height()
-        cx, cy = W / 2.0, H / 2.0
-        return (self.d2_x0 + (px - cx) / self.d2_scale,
-                self.d2_y0 + (cy - py) / self.d2_scale)
-
-    def _d2_on_press(self, event):
-        # Check if a slider handle was grabbed
-        canvas = self.d2_canvas
-        W = canvas.winfo_width()
-        H = canvas.winfo_height()
-        cx, cy = W / 2.0, H / 2.0
-        for name, s in self.d2_sliders.items():
-            hx = cx + (s["value"] - self.d2_x0) * self.d2_scale
-            hy = cy - (0 - self.d2_y0) * self.d2_scale
-            if abs(hx - event.x) < 12 and abs(hy - event.y) < 12:
-                self.d2_drag = ("slider", name, s)
-                return
-        self.d2_drag = ("pan", event.x, event.y, self.d2_x0, self.d2_y0)
-
-    def _d2_on_drag(self, event):
-        if not self.d2_drag:
-            return
-        if self.d2_drag[0] == "pan":
-            _, sx0, sy0, wx0, wy0 = self.d2_drag
-            dx = event.x - sx0
-            dy = event.y - sy0
-            self.d2_x0 = wx0 - dx / self.d2_scale
-            self.d2_y0 = wy0 + dy / self.d2_scale
-            self._d2_draw()
-        elif self.d2_drag[0] == "slider":
-            _, name, s = self.d2_drag
-            wx, wy = self._d2_world(event.x, event.y)
-            lo, hi = s["min"], s["max"]
-            v = max(lo, min(hi, wx))
-            self.d2_updating = True
-            s["value"] = v
-            s["label"].config(text=f"{v:.4g}")
-            s["scale"].set(v)
-            try:
-                s["expr"]["var"].set(f"{name} = {v:.6g}")
-            except Exception:
-                pass
-            self.d2_updating = False
-            self._d2_draw()
-
-    def _d2_on_release(self, event):
-        self.d2_drag = None
-
-    def _d2_on_wheel(self, event):
-        factor = 1.15 if event.delta > 0 else 1 / 1.15
-        self._d2_zoom_at(factor, event.x, event.y)
-
-    def _d2_zoom(self, factor):
-        canvas = self.d2_canvas
-        self._d2_zoom_at(factor, canvas.winfo_width() / 2.0, canvas.winfo_height() / 2.0)
-
-    def _d2_zoom_at(self, factor, px, py):
-        canvas = self.d2_canvas
-        W = canvas.winfo_width()
-        H = canvas.winfo_height()
-        cx, cy = W / 2.0, H / 2.0
-        wx = self.d2_x0 + (px - cx) / self.d2_scale
-        wy = self.d2_y0 + (cy - py) / self.d2_scale
-        new_scale = max(1.0, min(5000.0, self.d2_scale * factor))
-        self.d2_x0 = wx - (px - cx) / new_scale
-        self.d2_y0 = wy + (py - cy) / new_scale
-        self.d2_scale = new_scale
-        self._d2_draw()
-
-    def _d2_on_motion(self, event):
-        self.d2_hover = (event.x, event.y)
-        self._d2_draw()
-
-    def _d2_set_hover(self, val):
-        self.d2_hover = val
-        if val is None:
-            self.d2_coord_label.config(text="")
-        self._d2_draw()
-
-    # ==================================================================
-    # CONVERTER
-    # ==================================================================
-    def open_converter(self):
-        win = tk.Toplevel(self.root)
-        win.title(self._t("converter"))
-        win.geometry("520x720")
-        win.resizable(True, True)
-        win.minsize(480, 600)
-        win.configure(bg=self.C_BG)
-        win.transient(self.root)
-        win.grab_set()
-
-        header = tk.Frame(win, bg=self.C_BG, height=60)
-        header.pack(fill="x", padx=20, pady=(16, 10))
-        header.pack_propagate(False)
-
-        tk.Label(header, text=self._t("converter"), bg=self.C_BG, fg=self.C_TEXT,
-                 font=tkfont.Font(family="Segoe UI", size=18, weight="bold"),
-                 anchor="w").pack(side="left", expand=True)
-        tk.Button(header, text="✕", command=win.destroy, bg=self.C_BG,
-                  fg=self.C_TEXT_DIM, font=self.f_btn, bd=0, relief="flat",
-                  cursor="hand2").pack(side="right")
-
-        cat_frame = tk.Frame(win, bg=self.C_BG)
-        cat_frame.pack(fill="x", padx=24, pady=(0, 16))
-
-        categories = ["Weight", "Currency", "Volume", "Area", "Distance"]
-        cat_labels = {c: self._t(c.lower()) for c in categories}
-        self.conv_category = tk.StringVar(value=categories[0])
-
-        for cat in categories:
-            rb = tk.Radiobutton(cat_frame, text=cat_labels[cat],
-                                variable=self.conv_category, value=cat,
-                                bg=self.C_BG, fg=self.C_TEXT, selectcolor=self.C_CARD,
-                                font=self.f_mode, activebackground=self.C_BG,
-                                activeforeground=self.C_TEXT,
-                                command=lambda: self._refresh_converter_units(win),
-                                bd=0, highlightthickness=0, padx=8)
-            rb.pack(side="left", padx=(0, 14))
-
-        conv_card = tk.Frame(win, bg=self.C_CARD, bd=0)
-        conv_card.pack(padx=20, pady=(0, 16), fill="both", expand=True)
-        inner = tk.Frame(conv_card, bg=self.C_CARD)
-        inner.pack(padx=20, pady=18, fill="both", expand=True)
-
-        tk.Label(inner, text=self._t("from"), bg=self.C_CARD, fg=self.C_TEXT_DIM,
-                 font=self.f_mode, anchor="w").pack(fill="x", pady=(0, 6))
-
-        self.conv_from_val = tk.StringVar(value="")
-        from_entry = tk.Entry(inner, textvariable=self.conv_from_val,
-                              font=self.f_display, bg="#f8fafc", fg=self.C_TEXT,
-                              bd=0, justify="right", insertbackground=self.C_TEXT)
-        from_entry.pack(fill="x", pady=(0, 10))
-        from_entry.bind("<KeyRelease>", lambda e: self._auto_convert(win))
-
-        self.conv_from_unit = ttk.Combobox(inner, state="readonly",
-                                           font=self.f_btn_s, height=10)
-        self.conv_from_unit.pack(fill="x", pady=(0, 18))
-
-        tk.Button(inner, text=self._t("swap"), command=lambda: self._swap_units(win),
-                  bg=self.C_ACCENT, fg="#ffffff", font=self.f_mode, bd=0,
-                  relief="flat", cursor="hand2", highlightthickness=0,
-                  padx=14, pady=7).pack(pady=(0, 18))
-
-        tk.Label(inner, text=self._t("to"), bg=self.C_CARD, fg=self.C_TEXT_DIM,
-                 font=self.f_mode, anchor="w").pack(fill="x", pady=(0, 6))
-
-        self.conv_to_val = tk.StringVar(value="")
-        to_entry = tk.Entry(inner, textvariable=self.conv_to_val,
-                            font=self.f_display, bg="#f8fafc", fg=self.C_TEXT,
-                            bd=0, justify="right", insertbackground=self.C_TEXT,
-                            state="readonly")
-        to_entry.pack(fill="x", pady=(0, 10))
-
-        self.conv_to_unit = ttk.Combobox(inner, state="readonly",
-                                         font=self.f_btn_s, height=10)
-        self.conv_to_unit.pack(fill="x", pady=(0, 20))
-
-        tk.Label(inner, text=self._t("copyright"), bg=self.C_CARD,
-                 fg=self.C_TEXT_DIM, font=self.f_footer, anchor="center").pack(side="bottom")
-
-        self._refresh_converter_units(win)
-
-    def _refresh_converter_units(self, win):
-        cat = self.conv_category.get()
-        units = list(self.UNITS[cat][self.lang].keys())
-        self.conv_from_unit["values"] = units
-        self.conv_to_unit["values"] = units
-        self.conv_from_unit.current(0)
-        self.conv_to_unit.current(min(1, len(units) - 1))
-        self.conv_from_val.set("")
-        self.conv_to_val.set("")
-
-    def _swap_units(self, win):
-        fi = self.conv_from_unit.current()
-        ti = self.conv_to_unit.current()
-        self.conv_from_unit.current(ti)
-        self.conv_to_unit.current(fi)
-        self._auto_convert(win)
-
-    def _auto_convert(self, win):
-        try:
-            cat = self.conv_category.get()
-            fu = self.conv_from_unit.get()
-            tu = self.conv_to_unit.get()
-            raw = self.conv_from_val.get().strip()
-            if raw == "":
-                self.conv_to_val.set("")
-                return
-            value = float(raw)
-            base = value / self.UNITS[cat][self.lang][fu]
-            result = base * self.UNITS[cat][self.lang][tu]
-            result_str = str(int(result)) if result == int(result) else f"{result:g}"
-            self.conv_to_val.set(result_str)
-        except Exception:
-            self.conv_to_val.set("")
-
-    # ==================================================================
-    # EQUATION SOLVER
-    # ==================================================================
-    def open_equation_solver(self):
-        win = tk.Toplevel(self.root)
-        win.title(self._t("eq_title"))
-        win.geometry("440x660")
-        win.resizable(True, True)
-        win.minsize(400, 500)
-        win.configure(bg=self.C_BG)
-        win.transient(self.root)
-        win.grab_set()
-
-        header = tk.Frame(win, bg=self.C_BG, height=60)
-        header.pack(fill="x", padx=20, pady=(16, 10))
-        header.pack_propagate(False)
-        tk.Label(header, text=self._t("eq_title"), bg=self.C_BG, fg=self.C_TEXT,
-                 font=tkfont.Font(family="Segoe UI", size=18, weight="bold"),
-                 anchor="w").pack(side="left", expand=True)
-        tk.Button(header, text="✕", command=win.destroy, bg=self.C_BG,
-                  fg=self.C_TEXT_DIM, font=self.f_btn, bd=0, relief="flat",
-                  cursor="hand2").pack(side="right")
-
-        nb = ttk.Notebook(win)
-        nb.pack(fill="both", expand=True, padx=16, pady=(0, 16))
-
-        style = ttk.Style()
-        style.theme_use('clam')
-        style.configure("TNotebook", background=self.C_BG, borderwidth=0)
-        style.configure("TNotebook.Tab", background=self.C_CARD,
-                        foreground=self.C_TEXT_DIM, padding=[14, 10], font=self.f_mode)
-        style.map("TNotebook.Tab", background=[("selected", self.C_CARD)],
-                  foreground=[("selected", self.C_TEXT)])
-
-        # ── Tab 1: 1st degree ──
-        tab1 = tk.Frame(nb, bg=self.C_CARD)
-        nb.add(tab1, text=self._t("eq1_tab"))
-        inner1 = tk.Frame(tab1, bg=self.C_CARD)
-        inner1.pack(padx=24, pady=20, fill="both", expand=True)
-
-        tk.Label(inner1, text="ax + b = 0", bg=self.C_CARD, fg=self.C_TEXT_DIM,
-                 font=self.f_mode, anchor="w").pack(fill="x", pady=(0, 16))
-        tk.Label(inner1, text=self._t("coeff_a"), bg=self.C_CARD, fg=self.C_TEXT_DIM,
-                 font=self.f_mode, anchor="w").pack(fill="x", pady=(0, 4))
-        self.eq1_a = tk.StringVar(value="")
-        tk.Entry(inner1, textvariable=self.eq1_a, font=self.f_display, bg="#f8fafc",
-                 fg=self.C_TEXT, bd=0, justify="center",
-                 insertbackground=self.C_TEXT).pack(fill="x", pady=(0, 14))
-        tk.Label(inner1, text=self._t("coeff_b"), bg=self.C_CARD, fg=self.C_TEXT_DIM,
-                 font=self.f_mode, anchor="w").pack(fill="x", pady=(0, 4))
-        self.eq1_b = tk.StringVar(value="")
-        tk.Entry(inner1, textvariable=self.eq1_b, font=self.f_display, bg="#f8fafc",
-                 fg=self.C_TEXT, bd=0, justify="center",
-                 insertbackground=self.C_TEXT).pack(fill="x", pady=(0, 20))
-        tk.Button(inner1, text=self._t("solve"), command=self._solve_eq1,
-                  bg=self.C_EQUATION_T, fg="#ffffff", font=self.f_eq, bd=0,
-                  relief="flat", cursor="hand2", highlightthickness=0,
-                  padx=20, pady=10).pack(fill="x", pady=(0, 16))
-        self.eq1_result = tk.Label(inner1, text="", bg=self.C_CARD, fg=self.C_TEXT,
-                                   font=self.f_display, anchor="center", justify="center")
-        self.eq1_result.pack(fill="x")
-        tk.Label(inner1, text="Use: sin, cos, tan, cot, log, ln, exp, sqrt, pi, e",
-                 bg=self.C_CARD, fg=self.C_TEXT_DIM, font=self.f_footer,
-                 anchor="w").pack(fill="x", pady=(10, 0))
-
-        # ── Tab 2: 2nd degree ──
-        tab2 = tk.Frame(nb, bg=self.C_CARD)
-        nb.add(tab2, text=self._t("eq2_tab"))
-        inner2 = tk.Frame(tab2, bg=self.C_CARD)
-        inner2.pack(padx=24, pady=20, fill="both", expand=True)
-
-        tk.Label(inner2, text="ax² + bx + c = 0", bg=self.C_CARD, fg=self.C_TEXT_DIM,
-                 font=self.f_mode, anchor="w").pack(fill="x", pady=(0, 16))
-        for key, var_name, pad in [("coeff_a", "eq2_a", 10), ("coeff_b", "eq2_b", 10),
-                                   ("coeff_c", "eq2_c", 20)]:
-            tk.Label(inner2, text=self._t(key), bg=self.C_CARD, fg=self.C_TEXT_DIM,
-                     font=self.f_mode, anchor="w").pack(fill="x", pady=(0, 4))
-            v = tk.StringVar(value="")
-            setattr(self, var_name, v)
-            tk.Entry(inner2, textvariable=v, font=self.f_display, bg="#f8fafc",
-                     fg=self.C_TEXT, bd=0, justify="center",
-                     insertbackground=self.C_TEXT).pack(fill="x", pady=(0, pad))
-        tk.Button(inner2, text=self._t("solve"), command=self._solve_eq2,
-                  bg=self.C_EQUATION_T, fg="#ffffff", font=self.f_eq, bd=0,
-                  relief="flat", cursor="hand2", highlightthickness=0,
-                  padx=20, pady=10).pack(fill="x", pady=(0, 16))
-        self.eq2_result = tk.Label(inner2, text="", bg=self.C_CARD, fg=self.C_TEXT,
-                                   font=self.f_display, anchor="center", justify="center")
-        self.eq2_result.pack(fill="x", pady=(0, 4))
-        self.eq2_delta = tk.Label(inner2, text="", bg=self.C_CARD, fg=self.C_TEXT_DIM,
-                                  font=self.f_mode, anchor="center", justify="center")
-        self.eq2_delta.pack(fill="x", pady=(0, 16))
-        tk.Label(inner2, text="Use: sin, cos, tan, cot, log, ln, exp, sqrt, pi, e",
-                 bg=self.C_CARD, fg=self.C_TEXT_DIM, font=self.f_footer,
-                 anchor="w").pack(fill="x")
-
-        # ── Tab 3: Expression ──
-        tab3 = tk.Frame(nb, bg=self.C_CARD)
-        nb.add(tab3, text="Expression")
-        inner3 = tk.Frame(tab3, bg=self.C_CARD)
-        inner3.pack(padx=24, pady=20, fill="both", expand=True)
-
-        tk.Label(inner3, text="Type your equation in x", bg=self.C_CARD,
-                 fg=self.C_TEXT_DIM, font=self.f_mode, anchor="w").pack(fill="x", pady=(0, 14))
-        tk.Label(inner3, text="Expression:", bg=self.C_CARD, fg=self.C_TEXT_DIM,
-                 font=self.f_mode, anchor="w").pack(fill="x", pady=(0, 4))
-        self.expr_input = tk.StringVar(value="sin(x) + cos(x) - 1")
-        tk.Entry(inner3, textvariable=self.expr_input, font=self.f_display,
-                 bg="#f8fafc", fg=self.C_TEXT, bd=0, justify="center",
-                 insertbackground=self.C_TEXT).pack(fill="x", pady=(0, 14))
-        tk.Label(inner3, text="Value of x:", bg=self.C_CARD, fg=self.C_TEXT_DIM,
-                 font=self.f_mode, anchor="w").pack(fill="x", pady=(0, 4))
-        self.x_value = tk.StringVar(value="0")
-        tk.Entry(inner3, textvariable=self.x_value, font=self.f_display, bg="#f8fafc",
-                 fg=self.C_TEXT, bd=0, justify="center",
-                 insertbackground=self.C_TEXT).pack(fill="x", pady=(0, 14))
-        tk.Button(inner3, text=self._t("calculate"), command=self._calc_expression,
-                  bg=self.C_EQUATION_T, fg="#ffffff", font=self.f_eq, bd=0,
-                  relief="flat", cursor="hand2", highlightthickness=0,
-                  padx=20, pady=10).pack(fill="x", pady=(0, 16))
-        self.expr_result = tk.Label(inner3, text="", bg=self.C_CARD, fg=self.C_TEXT,
-                                    font=self.f_display, anchor="center", justify="center")
-        self.expr_result.pack(fill="x")
-
-        tk.Label(inner3, text=self._t("copyright"), bg=self.C_CARD,
-                 fg=self.C_TEXT_DIM, font=self.f_footer,
-                 anchor="center").pack(side="bottom", pady=(10, 0))
-
-    def _parse_coeff(self, value_str):
-        s = value_str.strip()
-        if s == "":
-            return 0.0
-        expr = s.replace('^', '**')
-        expr = re.sub(r'(\d)(?=[a-zA-Z(])', r'\1*', expr)
-        expr = re.sub(r'([a-zA-Z])(?=[a-zA-Z])', r'\1*', expr)
-        expr = expr.replace('pi', 'math.pi')
-        for fn in ('sin', 'cos', 'tan', 'cot', 'log', 'ln', 'exp', 'sqrt'):
-            expr = re.sub(r'\b' + fn + r'\(', fn + '(', expr, flags=re.IGNORECASE)
-        try:
-            return float(eval(expr, {"__builtins__": {}}, {"math": math}))
-        except Exception:
-            return 0.0
-
-    def _solve_eq1(self):
-        try:
-            a = self._parse_coeff(self.eq1_a.get())
-            b = self._parse_coeff(self.eq1_b.get())
-            if a == 0:
-                if b == 0:
-                    self.eq1_result.config(text=self._t("inf_solutions"), fg=self.C_TEXT_DIM)
-                else:
-                    self.eq1_result.config(text=self._t("no_solution"), fg=self.C_CLEAR_T)
-            else:
-                x = -b / a
-                x_str = str(int(x)) if x == int(x) else f"{x:g}"
-                self.eq1_result.config(text=f"x = {x_str}", fg=self.C_TEXT)
-        except Exception:
-            self.eq1_result.config(text=self._t("invalid_input"), fg=self.C_CLEAR_T)
-
-    def _solve_eq2(self):
-        try:
-            a = self._parse_coeff(self.eq2_a.get())
-            b = self._parse_coeff(self.eq2_b.get())
-            c = self._parse_coeff(self.eq2_c.get())
-            if a == 0:
-                if b == 0:
-                    if c == 0:
-                        self.eq2_result.config(text=self._t("inf_solutions"), fg=self.C_TEXT_DIM)
-                        self.eq2_delta.config(text="")
-                    else:
-                        self.eq2_result.config(text=self._t("no_solution"), fg=self.C_CLEAR_T)
-                        self.eq2_delta.config(text="")
-                else:
-                    x = -c / b
-                    x_str = str(int(x)) if x == int(x) else f"{x:g}"
-                    self.eq2_result.config(text=f"x = {x_str}", fg=self.C_TEXT)
-                    self.eq2_delta.config(text="(1st degree)", fg=self.C_TEXT_DIM)
-                return
-            delta = b * b - 4 * a * c
-            if delta > 0:
-                x1 = (-b - math.sqrt(delta)) / (2 * a)
-                x2 = (-b + math.sqrt(delta)) / (2 * a)
-                self.eq2_result.config(text=f"x₁ = {x1:g}\nx₂ = {x2:g}", fg=self.C_TEXT)
-                self.eq2_delta.config(text=f"Δ = {delta:g} > 0", fg=self.C_FUNC_T)
-            elif delta == 0:
-                x = -b / (2 * a)
-                x_str = str(int(x)) if x == int(x) else f"{x:g}"
-                self.eq2_result.config(text=f"x₀ = {x_str} (double)", fg=self.C_TEXT)
-                self.eq2_delta.config(text="Δ = 0 (double root)", fg=self.C_FUNC_T)
-            else:
-                self.eq2_result.config(text="No real roots", fg=self.C_TEXT_DIM)
-                self.eq2_delta.config(text=f"Δ = {delta:g} < 0", fg=self.C_TEXT_DIM)
-        except Exception:
-            self.eq2_result.config(text=self._t("invalid_input"), fg=self.C_CLEAR_T)
-            self.eq2_delta.config(text="")
-
-    def _calc_expression(self):
-        try:
-            expr = self.expr_input.get().strip()
-            x_str = self.x_value.get().strip()
-            if expr == "" or x_str == "":
-                self.expr_result.config(text="Please fill all fields", fg=self.C_CLEAR_T)
-                return
-            x = float(x_str)
-            s = self._d2_to_python(expr)
-            ns = self._d2_namespace()
-            result = float(eval(s, {"__builtins__": {}}, {**ns, "x": x}))
-            if not math.isfinite(result):
-                self.expr_result.config(text="Undefined", fg=self.C_CLEAR_T)
-                return
-            result_str = str(int(result)) if result == int(result) else f"{result:g}"
-            self.expr_result.config(text=f"Result: {result_str}", fg=self.C_TEXT)
-        except Exception:
-            self.expr_result.config(text=self._t("invalid_input"), fg=self.C_CLEAR_T)
-
-    # ==================================================================
-    # SCIENTIFIC FORMULAS
-    # ==================================================================
-    def open_formulas(self):
-        win = tk.Toplevel(self.root)
-        win.title(self._t("formula_title"))
-        win.geometry("560x700")
-        win.resizable(True, True)
-        win.minsize(500, 550)
-        win.configure(bg=self.C_BG)
-        win.transient(self.root)
-        win.grab_set()
-
-        header = tk.Frame(win, bg=self.C_BG, height=60)
-        header.pack(fill="x", padx=20, pady=(16, 10))
-        header.pack_propagate(False)
-        tk.Label(header, text=self._t("formula_title"), bg=self.C_BG, fg=self.C_TEXT,
-                 font=tkfont.Font(family="Segoe UI", size=18, weight="bold"),
-                 anchor="w").pack(side="left", expand=True)
-        tk.Button(header, text="✕", command=win.destroy, bg=self.C_BG,
-                  fg=self.C_TEXT_DIM, font=self.f_btn, bd=0, relief="flat",
-                  cursor="hand2").pack(side="right")
-
-        container = tk.Frame(win, bg=self.C_BG)
-        container.pack(fill="both", expand=True, padx=20, pady=(0, 16))
-
-        canvas = tk.Canvas(container, bg=self.C_BG, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
-        scrollable_frame = tk.Frame(canvas, bg=self.C_BG)
-        scrollable_frame.bind("<Configure>",
-                              lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-        formulas = [
-            ("formula_quadratic",
-             "ax² + bx + c = 0  →  x = (-b ± √(b²-4ac)) / 2a",
-             ["a", "b", "c"], self._calc_quadratic_result),
-            ("formula_area_circle", "Area = π × r²", ["r (radius)"],
-             lambda v: math.pi * v[0] ** 2),
-            ("formula_area_rect", "Area = length × width", ["length", "width"],
-             lambda v: v[0] * v[1]),
-            ("formula_area_triangle", "Area = (base × height) / 2", ["base", "height"],
-             lambda v: (v[0] * v[1]) / 2),
-            ("formula_volume_sphere", "Volume = (4/3) × π × r³", ["r (radius)"],
-             lambda v: (4 / 3) * math.pi * v[0] ** 3),
-            ("formula_volume_cyl", "Volume = π × r² × h", ["r (radius)", "h (height)"],
-             lambda v: math.pi * v[0] ** 2 * v[1]),
-            ("formula_ohm", "Voltage = Current × Resistance", ["I (current)", "R (resistance)"],
-             lambda v: v[0] * v[1]),
-            ("formula_force", "Force = mass × acceleration", ["mass", "acceleration"],
-             lambda v: v[0] * v[1]),
-            ("formula_kinetic", "KE = (1/2) × m × v²", ["m (mass)", "v (velocity)"],
-             lambda v: 0.5 * v[0] * v[1] ** 2),
-        ]
-
-        for key, desc, inputs, calc in formulas:
-            card = tk.Frame(scrollable_frame, bg=self.C_CARD, bd=0, highlightthickness=1,
-                            highlightbackground="#e2e8f0")
-            card.pack(fill="x", pady=8, padx=4)
-            inner = tk.Frame(card, bg=self.C_CARD)
-            inner.pack(padx=16, pady=12, fill="x")
-
-            tk.Label(inner, text=self._t(key), bg=self.C_CARD, fg=self.C_TEXT,
-                     font=self.f_eq, anchor="w").pack(fill="x", pady=(0, 4))
-            tk.Label(inner, text=desc, bg=self.C_CARD, fg=self.C_TEXT_DIM,
-                     font=self.f_expr, anchor="w").pack(fill="x", pady=(0, 10))
-
-            entry_vars = []
-            for inp_label in inputs:
-                row = tk.Frame(inner, bg=self.C_CARD)
-                row.pack(fill="x", pady=3)
-                tk.Label(row, text=inp_label + ":", bg=self.C_CARD, fg=self.C_TEXT_DIM,
-                         font=self.f_mode, width=14, anchor="w").pack(side="left")
-                var = tk.StringVar(value="")
-                tk.Entry(row, textvariable=var, font=self.f_display, bg="#f8fafc",
-                         fg=self.C_TEXT, bd=0, justify="right",
-                         insertbackground=self.C_TEXT).pack(side="left", fill="x",
-                                                            expand=True, padx=(8, 0))
-                entry_vars.append(var)
-
-            result_label = tk.Label(inner, text="", bg=self.C_CARD, fg=self.C_TEXT,
-                                    font=self.f_display, anchor="w")
-            result_label.pack(fill="x", pady=(8, 0))
-
-            def make_cmd(rl=result_label, cf=calc, ev=list(entry_vars)):
-                def cmd():
-                    try:
-                        vals = []
-                        for var in ev:
-                            v = var.get().strip()
-                            if v == "":
-                                rl.config(text="Please fill all fields", fg=self.C_CLEAR_T)
-                                return
-                            vals.append(float(v))
-                        res = cf(vals)
-                        if isinstance(res, str):
-                            rs = res
-                        elif res == int(res):
-                            rs = str(int(res))
-                        else:
-                            rs = f"{res:g}"
-                        rl.config(text=f"{self._t('formula_result')}: {rs}", fg=self.C_TEXT)
-                    except Exception:
-                        rl.config(text=self._t("invalid_input"), fg=self.C_CLEAR_T)
-                return cmd
-
-            tk.Button(inner, text=self._t("calculate"), command=make_cmd(),
-                      bg=self.C_FORMULA_T, fg="#ffffff", font=self.f_eq, bd=0,
-                      relief="flat", cursor="hand2", highlightthickness=0,
-                      padx=16, pady=6).pack(fill="x", pady=(10, 0))
-
-        tk.Label(scrollable_frame, text=self._t("copyright"), bg=self.C_BG,
-                 fg=self.C_TEXT_DIM, font=self.f_footer,
-                 anchor="center").pack(pady=(10, 0))
-
-    def _calc_quadratic_result(self, vals):
-        a, b, c = vals
-        if a == 0:
-            return "Not quadratic (a=0)"
-        delta = b * b - 4 * a * c
-        if delta > 0:
-            x1 = (-b - math.sqrt(delta)) / (2 * a)
-            x2 = (-b + math.sqrt(delta)) / (2 * a)
-            return f"x₁={x1:g}, x₂={x2:g}"
-        elif delta == 0:
-            return f"x={-b / (2 * a):g} (double)"
-        return "No real roots"
-
-    # ==================================================================
-    # CALCULATOR CORE
-    # ==================================================================
-    def _add_hover(self, btn, normal, hover):
-        btn.bind("<Enter>", lambda e: btn.configure(bg=hover))
-        btn.bind("<Leave>", lambda e: btn.configure(bg=normal))
-
-    def _bind_keys(self):
-        self.root.bind("<Return>", lambda e: self.calculate())
-        self.root.bind("<KP_Enter>", lambda e: self.calculate())
-        self.root.bind("<BackSpace>", lambda e: self.backspace())
-        self.root.bind("<Escape>", lambda e: self.clear_all())
-        for key in "0123456789+-*/().":
-            self.root.bind(key, lambda e, k=key: self._key_char(k))
-
-    def _key_char(self, ch):
-        if ch in "0123456789.":
-            self._add_digit(ch)
-        elif ch in "+-*/()":
-            self._add_char(ch)
-
-    def _noop(self):
-        pass
-
-    def _set_display(self, value):
-        self.display_var.set(value)
-
-    def _get_display(self):
-        return self.display_var.get()
-
-    def _add_digit(self, digit):
-        current = self._get_display()
-        if self.new_input or current in ("0", "Error"):
-            self._set_display(digit if digit != "." else "0.")
-            self.new_input = False
-        else:
-            if digit == "." and "." in current:
-                return
-            self._set_display(current + digit)
-
-    def _add_char(self, ch):
-        current = self._get_display()
-        if current in ("0", "Error"):
-            self._set_display(ch)
-            self.new_input = False
-            return
-        self._set_display(current + ch)
-        self.new_input = False
-
-    def _add_operator(self, op):
-        current = self._get_display()
-        if current in ("0", "Error"):
-            return
-        if current and current[-1] in "+-*/**":
-            self._set_display(current[:-1] + op)
-        else:
-            self._set_display(current + op)
-        self.new_input = False
-
-    def backspace(self):
-        current = self._get_display()
-        if current in ("Error",):
-            return
-        if len(current) > 1:
-            self._set_display(current[:-1])
-        else:
-            self._set_display("0")
-        self.new_input = False
-
-    def clear_all(self):
-        self.expression = ""
-        self._set_display("0")
-        self.expr_var.set("")
-        self.new_input = True
-
-    def calculate(self):
-        expr = self._get_display()
-        if expr in ("0", "Error", ""):
-            return
-        try:
-            safe = expr.replace("×", "*").replace("÷", "/").replace("−", "-")
-            result = eval(safe, {"__builtins__": {}}, {"math": math})
-            if isinstance(result, float):
-                result = int(result) if result.is_integer() else round(result, 10)
-            self.expr_var.set(expr + " =")
-            self._set_display(str(result))
-            self.new_input = True
-        except Exception:
-            self._set_display("Error")
-            self.new_input = True
-
-    def _math_func(self, name):
-        current = self._get_display()
-        if current in ("0", "Error", ""):
-            return
-        try:
-            val = float(current)
-            res = val ** 2 if name == "square" else val
-            self._set_display(self._fmt(res))
-            self.new_input = True
-        except Exception:
-            self._set_display("Error")
-            self.new_input = True
-
-    def _sci_func(self, name):
-        current = self._get_display()
-        if current in ("0", "Error", ""):
-            return
-        try:
-            val = float(current)
-            rad = math.radians(val) if self.deg_mode else val
-            if name == "sin":
-                res = math.sin(rad)
-            elif name == "cos":
-                res = math.cos(rad)
-            elif name == "tan":
-                res = math.tan(rad)
-            elif name == "log10":
-                if val <= 0:
-                    raise ValueError
-                res = math.log10(val)
-            elif name == "ln":
-                if val <= 0:
-                    raise ValueError
-                res = math.log(val)
-            elif name == "sqrt":
-                if val < 0:
-                    raise ValueError
-                res = math.sqrt(val)
-            elif name == "factorial":
-                if val < 0 or val != int(val):
-                    raise ValueError
-                res = math.factorial(int(val))
-            elif name == "pi":
-                res = math.pi
-            elif name == "exp":
-                res = math.exp(val)
-            elif name == "pow10":
-                res = 10 ** val
-            elif name == "mod":
-                self._set_display(str(val % 1))
-                self.new_input = True
-                return
-            elif name == "neg":
-                res = -val
-            else:
-                return
-            self._set_display(self._fmt(res))
-            self.new_input = True
-        except Exception:
-            self._set_display("Error")
-            self.new_input = True
-
-    def _fmt(self, num):
-        if isinstance(num, float):
-            return str(int(num)) if num.is_integer() else f"{num:g}"
-        return str(num)
-
-    def toggle_deg_rad(self):
-        self.deg_mode = not self.deg_mode
-        self.mode_label.config(text="DEG" if self.deg_mode else "RAD")
-
-    def mc(self):
-        self.memory = 0
-
-    def mr(self):
-        self._set_display(self._fmt(self.memory))
-        self.new_input = True
-
-    def m_add(self):
-        try:
-            self.memory += float(self._get_display())
-        except Exception:
-            pass
-
-    def m_sub(self):
-        try:
-            self.memory -= float(self._get_display())
-        except Exception:
-            pass
+        self._create_views()
+        self._build_header()
+        self.calculator.build()
+
+    def _create_views(self):
+        """Instantiate every view (fresh widget references)."""
+        self.calculator = CalculatorView(self)
+        self.grapher = GrapherView(self)
+        self.converter = ConverterView(self)
+        self.equations = EquationsView(self)
+        self.formulas = FormulasView(self)
+        self.matrices = MatrixView(self)
+        self.calculus = CalculusView(self)
+        self.statistics = StatsView(self)
 
 
 def main():
     root = tk.Tk()
-    app = ScientificCalculator(root)
+    app = ScientificCalculatorApp(root)
     root.mainloop()
 
 

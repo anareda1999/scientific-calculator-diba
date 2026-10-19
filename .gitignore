@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 *.pyd
 .Python
+.pytest_cache/
 
 # ── PyInstaller build output ────────────────────────────
 build/
