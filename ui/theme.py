@@ -82,4 +82,7 @@ class Theme:
             "title_s": tkfont.Font(family="Segoe UI", size=16, weight="bold"),
             "section": tkfont.Font(family="Segoe UI", size=11, weight="bold"),
             "mono":    tkfont.Font(family="JetBrains Mono", size=12),
+            # compact font for small inline fields (matrix cells, bounds, ...)
+            "input":   tkfont.Font(family="Segoe UI", size=15, weight="bold"),
+            "input_s": tkfont.Font(family="Segoe UI", size=12, weight="bold"),
         }

@@ -87,8 +87,8 @@ class StatsView:
         frame = tk.Frame(inner, bg=th.CARD)
         frame.pack(fill="x", pady=(0, 16))
         self.percent_var = tk.StringVar(value="90")
-        tk.Entry(frame, textvariable=self.percent_var, font=self.f["display"],
-                 bg="#f8fafc", fg=th.TEXT, bd=0, justify="right",
+        tk.Entry(frame, textvariable=self.percent_var, font=self.f["input"],
+                 bg="#f8fafc", fg=th.TEXT, bd=0, justify="right", width=10,
                  insertbackground=th.TEXT).pack(side="left", fill="x", expand=True,
                                                padx=(0, 8))
         tk.Button(frame, text=self.t("calculate"), command=self._percentile,

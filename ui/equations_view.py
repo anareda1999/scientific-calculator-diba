@@ -264,15 +264,19 @@ class EquationsView:
         self._label(inner, self.t("interval"), (0, 10))
         frame = tk.Frame(inner, bg=th.CARD)
         frame.pack(fill="x", pady=(0, 12))
+        frame.columnconfigure(0, weight=1, uniform="iv")
+        frame.columnconfigure(2, weight=1, uniform="iv")
         self.root_from = tk.StringVar(value="-10")
         self.root_to = tk.StringVar(value="10")
-        for var, label in ((self.root_from, "from"), (self.root_to, "to")):
-            e = tk.Entry(frame, textvariable=var, font=self.f["display"],
-                         bg="#f8fafc", fg=th.TEXT, bd=0, justify="right",
-                         insertbackground=th.TEXT)
-            e.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        tk.Entry(frame, textvariable=self.root_from, font=self.f["input"],
+                 bg="#f8fafc", fg=th.TEXT, bd=0, justify="right", width=10,
+                 insertbackground=th.TEXT).grid(row=0, column=0, sticky="ew",
+                                               padx=(0, 8))
         tk.Label(frame, text="→", bg=th.CARD, fg=th.TEXT_DIM,
-                 font=self.f["mode"]).pack(side="left", padx=(0, 8))
+                 font=self.f["mode"]).grid(row=0, column=1, padx=(0, 8))
+        tk.Entry(frame, textvariable=self.root_to, font=self.f["input"],
+                 bg="#f8fafc", fg=th.TEXT, bd=0, justify="right", width=10,
+                 insertbackground=th.TEXT).grid(row=0, column=2, sticky="ew")
 
         self._solve_button(inner, self.find_roots, self.t("find_roots"))
         self.roots_result = self._result_label(inner)
@@ -349,16 +353,29 @@ class EquationsView:
         n = self.sys_size.get()
         for row in range(n):
             frame = tk.Frame(self.sys_frame, bg=self.theme.CARD)
-            frame.pack(fill="x", pady=4)
-            for col in range(n + 1):
+            frame.pack(fill="x", pady=5)
+            # n coefficient cells + "=" + right-hand side
+            for col in range(n):
+                frame.columnconfigure(col, weight=1, uniform=f"sys{row}")
+            frame.columnconfigure(n + 1, weight=1)
+
+            for col in range(n):
                 var = tk.StringVar(value="")
-                e = tk.Entry(frame, textvariable=var, font=self.f["display"],
-                             bg="#f8fafc", fg=self.theme.TEXT, bd=0, justify="right",
-                             insertbackground=self.theme.TEXT, width=6)
-                e.pack(side="left", fill="x", expand=True, padx=3)
+                entry = tk.Entry(frame, textvariable=var, font=self.f["input"],
+                                 bg="#f8fafc", fg=self.theme.TEXT, bd=0, width=6,
+                                 justify="right", insertbackground=self.theme.TEXT)
+                entry.grid(row=0, column=col, sticky="ew", padx=3)
                 self.sys_vars.append(var)
+
             tk.Label(frame, text="=", bg=self.theme.CARD, fg=self.theme.TEXT_DIM,
-                     font=self.f["mode"]).pack(side="left", padx=4)
+                     font=self.f["mode"]).grid(row=0, column=n, padx=6)
+
+            var = tk.StringVar(value="")
+            entry = tk.Entry(frame, textvariable=var, font=self.f["input"],
+                             bg="#f8fafc", fg=self.theme.TEXT, bd=0, width=6,
+                             justify="right", insertbackground=self.theme.TEXT)
+            entry.grid(row=0, column=n + 1, sticky="ew", padx=3)
+            self.sys_vars.append(var)
 
     def solve_system(self):
         try:

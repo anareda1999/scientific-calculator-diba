@@ -60,16 +60,20 @@ class MatrixView:
                            activeforeground=th.TEXT, command=self._rebuild,
                            bd=0, highlightthickness=0, padx=8).pack(side="left")
 
-        # Two matrices side by side
+        # Two matrices side by side (grid so both get an equal share)
         grids = tk.Frame(body, bg=th.BG)
         grids.pack(fill="both", expand=True)
+        grids.columnconfigure(0, weight=1, uniform="matrix")
+        grids.columnconfigure(1, weight=1, uniform="matrix")
+        grids.rowconfigure(0, weight=1)
 
         self.mat_a = tk.Frame(grids, bg=th.CARD, highlightthickness=1,
                               highlightbackground=th.BORDER)
-        self.mat_a.pack(side="left", fill="both", expand=True, padx=(0, 8))
+        self.mat_a.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+
         self.mat_b = tk.Frame(grids, bg=th.CARD, highlightthickness=1,
                               highlightbackground=th.BORDER)
-        self.mat_b.pack(side="left", fill="both", expand=True, padx=(8, 0))
+        self.mat_b.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
 
         # Operations
         ops = tk.Frame(body, bg=th.BG)
@@ -139,18 +143,20 @@ class MatrixView:
             for child in frame.winfo_children():
                 child.destroy()
             tk.Label(frame, text=title, bg=self.theme.CARD, fg=self.theme.TEXT_DIM,
-                     font=self.f["mode"]).pack(anchor="w", padx=12, pady=(10, 4))
+                     font=self.f["mode"]).pack(anchor="w", padx=12, pady=(10, 6))
             for r in range(self.size):
                 row = tk.Frame(frame, bg=self.theme.CARD)
-                row.pack(fill="x", pady=2, padx=12)
+                row.pack(fill="x", pady=3, padx=12)
+                # every cell of the row gets exactly the same width
+                for c in range(self.size):
+                    row.columnconfigure(c, weight=1, uniform=f"cell{r}")
                 for c in range(self.size):
                     var = tk.StringVar(value="0")
-                    tk.Entry(row, textvariable=var, font=self.f["display"],
-                             bg="#f8fafc", fg=self.theme.TEXT, bd=0, justify="right",
-                             insertbackground=self.theme.TEXT).pack(side="left",
-                                                                   fill="x",
-                                                                   expand=True,
-                                                                   padx=3)
+                    entry = tk.Entry(row, textvariable=var, font=self.f["input"],
+                                     bg="#f8fafc", fg=self.theme.TEXT, bd=0,
+                                     justify="right", insertbackground=self.theme.TEXT,
+                                     width=6)
+                    entry.grid(row=0, column=c, sticky="ew", padx=3)
                     store.append(var)
 
     def _read(self, store):
